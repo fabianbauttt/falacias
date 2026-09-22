@@ -349,6 +349,18 @@ let totalAttempts = 0;
 // clics y habilita "Siguiente caso".
 let currentAttempts = 0;
 let caseResolved = false;
+// Diario de Caza: estadísticas por familia y cronómetro de ESTA ronda de 36
+// casos. Se reinician en cada buildQueue() (ronda nueva), a diferencia de
+// criticalAnalysisPoints/totalAttempts, que persisten entre rondas mientras
+// la pestaña siga abierta.
+let categoryStats = {};
+let roundStartTime = 0;
+
+function freshCategoryStats(){
+  const stats = {};
+  CAT_ORDER.forEach(function(catKey){ stats[catKey] = { correct: 0, total: 0 }; });
+  return stats;
+}
 
 function shuffle(arr){
   const a = arr.slice();
@@ -362,6 +374,8 @@ function shuffle(arr){
 function buildQueue(){
   queue = shuffle(PRACTICE.map(function(_,i){return i;}));
   qIndex = 0;
+  categoryStats = freshCategoryStats();
+  roundStartTime = Date.now();
 }
 
 const progressLabel = document.getElementById("progressLabel");
@@ -377,6 +391,12 @@ const feedbackBox = document.getElementById("feedbackBox");
 const feedbackVerdict = document.getElementById("feedbackVerdict");
 const feedbackBody = document.getElementById("feedbackBody");
 const nextBtn = document.getElementById("nextBtn");
+const practiceFrame = document.getElementById("practiceFrame");
+const journalPanel = document.getElementById("journalPanel");
+const journalTitle = document.getElementById("journalTitle");
+const journalSkills = document.getElementById("journalSkills");
+const journalTime = document.getElementById("journalTime");
+const journalRestartBtn = document.getElementById("journalRestartBtn");
 
 function pickOptions(correctFallacy){
   const pool = FALLACIES.filter(function(f){ return f.id !== correctFallacy.id; });
@@ -397,7 +417,6 @@ function renderQuestion(moveFocusToFirstOption){
   const focusWasInPractice = document.activeElement &&
     (document.activeElement === nextBtn || optionsRoot.contains(document.activeElement));
 
-  if(qIndex >= queue.length){ buildQueue(); }
   const practiceIdx = queue[qIndex];
   const entry = PRACTICE[practiceIdx];
   const correctId = entry[0];
@@ -469,6 +488,12 @@ function showHint(chosen){
 // era de un solo intento.
 function closeCase(chosen, correctFallacy, isCorrect){
   caseResolved = true;
+  // Diario de Caza: cada caso cerrado (con o sin acierto) cuenta para la
+  // familia de LA FALACIA CORRECTA de este enunciado, no para la que eligió
+  // el estudiante — así el panel final mide qué familias reconoce bien,
+  // no qué opciones tocó.
+  categoryStats[correctFallacy.cat].total++;
+  if(isCorrect){ categoryStats[correctFallacy.cat].correct++; }
   // Puntos de Análisis Crítico: solo suman, nunca se expresan como
   // fracción de intentos fallidos — un acierto al segundo intento vale lo
   // mismo que uno al primero, porque lo que se está reconociendo es haber
@@ -552,9 +577,114 @@ function handleAnswer(chosen, correctFallacy, btn){
   }
 }
 
+// Formatea milisegundos como "Ns" o "M min Ns" para el Diario de Caza. Solo
+// se usa una vez por ronda (al mostrar el panel final), así que no necesita
+// actualizarse en vivo ni manejar horas.
+function formatElapsed(ms){
+  const totalSeconds = Math.max(0, Math.round(ms / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if(minutes === 0){ return seconds + " s"; }
+  return minutes + " min " + seconds + " s";
+}
+
+// Construye el gráfico de barras (una fila por familia) y el tiempo total
+// de la ronda a partir de categoryStats/roundStartTime. Se llama justo
+// antes de revelar el panel, así que siempre refleja los 36 casos recién
+// terminados.
+function renderJournal(){
+  journalSkills.innerHTML = "";
+  const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const fillsToAnimate = [];
+
+  CAT_ORDER.forEach(function(catKey){
+    const cat = CATS[catKey];
+    const stats = categoryStats[catKey];
+    const pct = stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : 0;
+
+    const row = document.createElement("div");
+    row.className = "skill-row";
+
+    const head = document.createElement("div");
+    head.className = "skill-row-head";
+    const label = document.createElement("span");
+    label.className = "skill-row-label";
+    label.textContent = cat.label;
+    const pctSpan = document.createElement("span");
+    pctSpan.className = "skill-row-pct";
+    pctSpan.textContent = stats.total > 0
+      ? stats.correct + " de " + stats.total + " · " + pct + "%"
+      : "Sin casos esta ronda";
+    head.appendChild(label);
+    head.appendChild(pctSpan);
+
+    const track = document.createElement("div");
+    track.className = "skill-bar-track";
+    track.setAttribute("role", "img");
+    track.setAttribute("aria-label", cat.label + ": " + pctSpan.textContent);
+    const fill = document.createElement("div");
+    fill.className = "skill-bar-fill";
+    fill.style.setProperty("--cat-color", catColor(catKey));
+    if(reduceMotion){
+      fill.style.width = pct + "%";
+    } else {
+      fill.style.width = "0%";
+      fillsToAnimate.push({ el: fill, pct: pct });
+    }
+    track.appendChild(fill);
+
+    row.appendChild(head);
+    row.appendChild(track);
+    journalSkills.appendChild(row);
+  });
+
+  if(fillsToAnimate.length){
+    requestAnimationFrame(function(){
+      fillsToAnimate.forEach(function(item){ item.el.style.width = item.pct + "%"; });
+    });
+  }
+
+  journalTime.textContent = "Tiempo de esta ronda: " + formatElapsed(Date.now() - roundStartTime);
+}
+
+// Reemplaza el contenedor de la pregunta por el Diario de Caza al terminar
+// los 36 casos de la ronda (nunca coexisten visibles). El foco pasa al
+// título del panel, con el mismo patrón tabindex="-1" + focus() usado ya
+// para statementText: quien navega con lector de pantalla necesita que se
+// anuncie el cambio de pantalla, no quedarse "colgado" en el botón que
+// acaba de desaparecer.
+function showJournal(){
+  renderJournal();
+  practiceFrame.hidden = true;
+  journalPanel.hidden = false;
+  journalTitle.focus();
+  scrollIntoViewPolite(journalTitle);
+}
+function hideJournal(){
+  journalPanel.hidden = true;
+  practiceFrame.hidden = false;
+}
+
 nextBtn.addEventListener("click", function(){
   qIndex++;
-  renderQuestion(true);
+  if(qIndex >= queue.length){
+    showJournal();
+  } else {
+    renderQuestion(true);
+  }
+});
+
+// "Practicar de nuevo": arma una ronda nueva (nuevo orden, categoryStats y
+// cronómetro en cero) sin tocar criticalAnalysisPoints ni totalAttempts,
+// que son marcadores de TODA la sesión, no de una ronda. El foco previo
+// (journalRestartBtn) no cuenta como "dentro de la práctica" para
+// renderQuestion, así que aquí se lleva el foco al enunciado explícitamente,
+// igual que al avanzar de un caso a otro.
+journalRestartBtn.addEventListener("click", function(){
+  buildQueue();
+  hideJournal();
+  renderQuestion(false);
+  statementText.focus();
 });
 
 buildQueue();

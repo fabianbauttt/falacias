@@ -589,10 +589,72 @@
   .opt-btn:active:not(:disabled){transform:scale(0.98);}
   .opt-btn:disabled{cursor:default;}
   .opt-btn:disabled:not(.correct):not(.wrong){opacity:0.5;}
-  .opt-btn.correct{background:var(--good-soft);border-color:var(--good);color:var(--good);}
+  /* "Jugosidad" del veredicto: un pulso + destello sutil en la opción
+     correcta, una sacudida breve en la incorrecta. Las dos animaciones
+     conservan las sombras inset del vidrio (--glass-hilite/--glass-shade)
+     en cada fotograma para que el efecto se sume al estilo existente en
+     vez de "apagarlo" a mitad de la animación. Ambas se desactivan por
+     completo bajo prefers-reduced-motion (ver media query más abajo); el
+     color de fondo/borde —que ya comunica el veredicto por sí solo, sin
+     depender del movimiento— no se ve afectado. */
+  .opt-btn.correct{
+    background:var(--good-soft);
+    border-color:var(--good);
+    color:var(--good);
+    animation:optCorrectPulse .5s ease-out;
+  }
   .opt-btn.correct .opt-letter{color:var(--good);}
-  .opt-btn.wrong{background:var(--bad-soft);border-color:var(--bad);color:var(--bad);}
+  /* La opción marcada .wrong pasa a segundo plano visual: opacidad
+     reducida sobre TODO el botón (fondo, borde y texto), no solo el
+     texto, para que se perciba como "ya resuelta, deja de mirarla" —
+     tanto en el primer intento (queda ahí mientras se elige de nuevo)
+     como en el cierre del caso (queda junto a la respuesta correcta ya
+     revelada). text-decoration:line-through en el botón se dibuja también
+     sobre sus <span> internos (letra + nombre) sin necesidad de repetirlo
+     en cada uno: así lo especifica el módulo de decoración de texto de
+     CSS. La reducción de contraste que trae opacity:0.4 es intencional y
+     no infringe WCAG 1.4.3: ese criterio excluye explícitamente a los
+     componentes de interfaz inactivos/deshabilitados, y este botón ya
+     queda con disabled=true en el momento en que se le aplica esta clase. */
+  .opt-btn.wrong{
+    background:var(--bad-soft);
+    border-color:var(--bad);
+    color:var(--bad);
+    opacity:0.4;
+    text-decoration:line-through;
+    text-decoration-color:currentColor;
+    text-decoration-thickness:1.5px;
+    animation:optWrongShake .4s ease-in-out;
+  }
   .opt-btn.wrong .opt-letter{color:var(--bad);}
+  @keyframes optCorrectPulse{
+    0%{
+      transform:scale(1);
+      box-shadow:
+        inset 0 1.5px 0 var(--glass-hilite),
+        inset 0 -1px 0 var(--glass-shade),
+        0 0 0 0 rgba(126,234,179,0);
+    }
+    45%{
+      transform:scale(1.04);
+      box-shadow:
+        inset 0 1.5px 0 var(--glass-hilite),
+        inset 0 -1px 0 var(--glass-shade),
+        0 0 14px 3px rgba(126,234,179,.65);
+    }
+    100%{
+      transform:scale(1);
+      box-shadow:
+        inset 0 1.5px 0 var(--glass-hilite),
+        inset 0 -1px 0 var(--glass-shade),
+        0 0 0 0 rgba(126,234,179,0);
+    }
+  }
+  @keyframes optWrongShake{
+    0%, 100%{transform:translateX(0);}
+    20%, 60%{transform:translateX(-4px);}
+    40%, 80%{transform:translateX(4px);}
+  }
   /* display:none sacaba este contenedor aria-live="polite" por completo
      del árbol de accesibilidad. Si el texto se inserta (handleAnswer) en
      el mismo instante en que pasa a visible, varios lectores de pantalla
@@ -635,7 +697,7 @@
   }
   @keyframes fadeSlideIn{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:translateY(0);}}
   @media (prefers-reduced-motion: reduce){
-    .feedback.show, .card.open .card-detail{animation:none;}
+    .feedback.show, .card.open .card-detail, .opt-btn.correct, .opt-btn.wrong{animation:none;}
   }
   .feedback.good{background:var(--good-soft);}
   .feedback.bad{background:var(--bad-soft);}
@@ -663,6 +725,109 @@
   .next-btn:hover:not(:disabled){filter:brightness(1.08);}
   .next-btn:active:not(:disabled){transform:scale(0.97);}
 
+  /* #practiceFrame se oculta con la propiedad hidden de JS al terminar la
+     ronda de 36 casos. .practice-frame no fija "display" en ninguna regla
+     de arriba, así que hoy el [hidden] nativo del navegador ya alcanzaría
+     por sí solo — pero se reafirma aquí de todas formas, siguiendo la
+     misma convención defensiva que .present-overlay[hidden] y
+     .family-grid[hidden]: si algún cambio futuro le agrega un "display" a
+     .practice-frame, ese futuro autor no tiene que acordarse de este caso
+     para no romperlo. */
+  #practiceFrame[hidden]{display:none;}
+
+  /* Diario de Caza: panel de resultados que reemplaza a #practiceFrame al
+     terminar los 36 casos de la ronda (nunca coexisten visibles). Reutiliza
+     el mismo vidrio que .practice-frame para que el cambio entre uno y otro
+     no se sienta como una pantalla distinta. */
+  .journal{
+    background:var(--glass-bg);
+    -webkit-backdrop-filter:var(--glass-blur);
+    backdrop-filter:var(--glass-blur);
+    border:1px solid var(--line);
+    border-radius:26px;
+    padding:26px;
+    box-shadow:
+      inset 0 1.5px 0 var(--glass-hilite),
+      inset 0 -1px 0 var(--glass-shade),
+      0 10px 30px var(--glass-drop);
+  }
+  /* Misma convención defensiva que #practiceFrame[hidden] de arriba. */
+  .journal[hidden]{display:none;}
+  .journal-title{
+    font-family:var(--font-display);
+    font-weight:600;
+    font-size:clamp(22px,4vw,28px);
+    margin:0 0 10px;
+  }
+  /* tabindex="-1" (ver app.js): el título recibe el foco por script al
+     abrir el panel, así que necesita un indicador visible de foco igual
+     que el resto de controles interactivos de la plataforma. */
+  .journal-title:focus-visible{outline:2px solid var(--accent);outline-offset:3px;}
+  .journal-intro{
+    font-size:14.5px;
+    color:var(--ink-soft);
+    max-width:62ch;
+    margin:0 0 22px;
+  }
+  .journal-skills{
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+    margin-bottom:22px;
+  }
+  .skill-row-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:10px;
+    margin-bottom:6px;
+    flex-wrap:wrap;
+  }
+  .skill-row-label{
+    font-family:var(--font-display);
+    font-weight:600;
+    font-size:15px;
+  }
+  .skill-row-pct{
+    font-family:var(--font-mono);
+    font-size:12.5px;
+    color:var(--ink-soft);
+    white-space:nowrap;
+  }
+  .skill-bar-track{
+    height:10px;
+    border-radius:999px;
+    background:rgba(255,255,255,.08);
+    border:1px solid var(--line);
+    overflow:hidden;
+  }
+  .skill-bar-fill{
+    height:100%;
+    border-radius:999px;
+    background:var(--cat-color, var(--accent));
+    transition:width .6s ease;
+  }
+  /* .skill-bar-fill anima con "transition" (el ancho lo fija app.js
+     directamente), no con "animation" como las reglas del bloque
+     prefers-reduced-motion más arriba, así que necesita su propia regla:
+     animation:none no afecta a transition. Va DESPUÉS de la regla base de
+     arriba a propósito —con la misma especificidad, en CSS gana la que
+     aparece más abajo en el archivo— para que sí logre anular esa
+     transición. app.js además fija el ancho final de una sola vez (sin
+     pasar por 0%) cuando detecta esta misma preferencia, así que esta regla
+     es un refuerzo por si el navegador llega a aplicar el ancho antes de
+     que corra ese script. */
+  @media (prefers-reduced-motion: reduce){
+    .skill-bar-fill{transition:none;}
+  }
+  .journal-meta{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    margin-bottom:22px;
+  }
+  .journal-actions{display:flex;justify-content:flex-end;}
+
   footer.note{
     margin-top:40px;
     font-size:12.5px;
@@ -678,6 +843,11 @@
   body.projection .opt-btn{font-size:18px;padding:16px 18px;}
   body.projection .feedback{font-size:17px;}
   body.projection nav.tabs button{font-size:19px;}
+  body.projection .journal-title{font-size:clamp(28px,5vw,38px);}
+  body.projection .journal-intro{font-size:17px;}
+  body.projection .skill-row-label{font-size:18px;}
+  body.projection .skill-row-pct{font-size:15px;}
+  body.projection .journal-meta .score-pill{font-size:15px;}
 
   /* Presentation overlay (Catálogo view: one expediente at a time) */
   .present-overlay{

@@ -52,7 +52,7 @@
     </section>
 
     <section class="view" id="view-practica" role="tabpanel" aria-labelledby="tab-practica">
-      <div class="practice-frame">
+      <div class="practice-frame" id="practiceFrame">
         <div class="practice-meta">
           <span id="progressLabel">Caso 1 de 36</span>
           <div class="score-group">
@@ -68,6 +68,23 @@
         </div>
         <div class="next-row">
           <button class="next-btn" id="nextBtn" type="button" disabled>Siguiente caso →</button>
+        </div>
+      </div>
+
+      <!-- Diario de Caza: reemplaza a #practiceFrame (nunca coexisten
+           visibles) al terminar la ronda de 36 casos. Los datos son solo de
+           ESTA ronda —se reinician cada vez que se vuelve a practicar— y,
+           como el resto de la Práctica, no se guardan ni se envían a
+           ningún lado: viven únicamente en la memoria de la pestaña. -->
+      <div class="journal" id="journalPanel" hidden>
+        <h2 class="journal-title" id="journalTitle" tabindex="-1">Diario de Caza</h2>
+        <p class="journal-intro">Terminaste las 36 falacias de esta ronda. Así te fue por familia — esto es para que veas dónde afinar la puntería, no una nota; no se guarda ni se comparte con nadie.</p>
+        <div class="journal-skills" id="journalSkills"></div>
+        <div class="journal-meta">
+          <span class="score-pill" id="journalTime">Tiempo de esta ronda: 0 s</span>
+        </div>
+        <div class="journal-actions">
+          <button class="next-btn" id="journalRestartBtn" type="button">Practicar de nuevo →</button>
         </div>
       </div>
     </section>
