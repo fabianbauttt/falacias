@@ -37,6 +37,51 @@ function catSoftBg(catKey){ return "var(" + CATS[catKey].soft + ")"; }
 function catColor(catKey){ return "var(" + CATS[catKey].varName + ")"; }
 function lower1(s){ return s.charAt(0).toLowerCase() + s.slice(1); }
 
+// ---------- Íconos de familia ----------
+// Un trazo simple (stroke=currentColor) por familia, deliberadamente
+// distinto del ícono de marca (la lupa del encabezado) para que cada
+// familia tenga su propia figura reconocible incluso a tamaño pequeño:
+// - ataque: un bocadillo de diálogo con una "X" (se ataca el mensaje/a la
+//   persona, no se responde el argumento).
+// - presión: un megáfono (voz amplificada por autoridad o por número).
+// - causa: un matraz (evidencia mal leída, no lectura literal de "ciencia").
+// - estructura: fichas de dominó cayendo (la "cadena de consecuencias" y
+//   las trampas de forma que fuerzan un camino único).
+// Cada una es puramente decorativa (aria-hidden: el nombre de la familia
+// siempre va al lado como texto real), así que no necesita texto alternativo.
+const CAT_ICON_PATHS = {
+  ataque:
+    '<path d="M4 6h13a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H9l-4 3v-3a2 2 0 0 1-2-2V8a2 2 0 0 1 1-2Z"/>' +
+    '<line x1="8.5" y1="10.5" x2="13.5" y2="14.5"/>' +
+    '<line x1="13.5" y1="10.5" x2="8.5" y2="14.5"/>',
+  presion:
+    '<path d="M3 10v4a1 1 0 0 0 1 1h2l6 4V5L6 9H4a1 1 0 0 0-1 1Z"/>' +
+    '<path d="M16 9a4 4 0 0 1 0 6"/>' +
+    '<path d="M19 6a8 8 0 0 1 0 12"/>',
+  causa:
+    '<path d="M9 3h6"/>' +
+    '<path d="M10 3v5.5L5.5 17a2 2 0 0 0 1.8 3h9.4a2 2 0 0 0 1.8-3L14 8.5V3"/>' +
+    '<line x1="8.5" y1="14" x2="15.5" y2="14"/>',
+  estructura:
+    '<rect x="3.5" y="4" width="4" height="12" rx="1"/>' +
+    '<rect x="10" y="6" width="4" height="12" rx="1" transform="rotate(18 12 12)"/>' +
+    '<rect x="16.5" y="9" width="4" height="12" rx="1" transform="rotate(34 18.5 15)"/>'
+};
+function catIconSvg(catKey){
+  return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" ' +
+    'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' +
+    CAT_ICON_PATHS[catKey] + '</svg>';
+}
+// Envoltorio <span> reutilizable: el tamaño y el color se controlan por CSS
+// según dónde se use (.family-icon en un lugar, .skill-row-icon en otro,
+// etc.), así el mismo SVG sirve para las 4 vistas sin duplicar marcado.
+function catIconEl(catKey, wrapperClass){
+  const span = document.createElement("span");
+  span.className = wrapperClass;
+  span.innerHTML = catIconSvg(catKey);
+  return span;
+}
+
 // ---------- Catalog ----------
 const catalogRoot = document.getElementById("catalog-root");
 CAT_ORDER.forEach(function(catKey){
@@ -51,6 +96,8 @@ CAT_ORDER.forEach(function(catKey){
   head.className = "category-head";
   const row = document.createElement("div");
   row.className = "row";
+  const headingIcon = catIconEl(catKey, "family-icon category-icon");
+  headingIcon.style.color = "var(" + cat.varName + ")";
   const h2 = document.createElement("h2");
   h2.textContent = cat.label;
   const tag = document.createElement("span");
@@ -58,6 +105,7 @@ CAT_ORDER.forEach(function(catKey){
   tag.style.background = "var(" + cat.soft + ")";
   tag.style.color = "var(" + cat.varName + ")";
   tag.textContent = "FAMILIA " + (CAT_ORDER.indexOf(catKey) + 1) + "/4";
+  row.appendChild(headingIcon);
   row.appendChild(h2);
   row.appendChild(tag);
   const desc = document.createElement("p");
@@ -104,7 +152,13 @@ CAT_ORDER.forEach(function(catKey){
     textWrap.appendChild(hookSpan);
     const icon = document.createElement("span");
     icon.className = "expand-icon";
-    icon.textContent = "+";
+    // Antes era el carácter "+" (que giraba 45° hasta parecer una "×" al
+    // expandir). Un chevron dibujado gira de forma más legible y encaja con
+    // el resto de trazos finos (stroke=currentColor) que ya usa la app.
+    icon.innerHTML =
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" ' +
+      'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' +
+      '<polyline points="6 9 12 15 18 9"/></svg>';
     icon.setAttribute("aria-hidden", "true");
     top.appendChild(textWrap);
     top.appendChild(icon);
@@ -153,10 +207,16 @@ CAT_ORDER.forEach(function(catKey){
   door.className = "family-card";
   door.dataset.cat = catKey;
   door.style.setProperty("--cat-color", catColor(catKey));
+  door.style.setProperty("--cat-soft-color", catSoftBg(catKey));
 
+  const head = document.createElement("span");
+  head.className = "family-card-head";
   const tag = document.createElement("span");
   tag.className = "family-card-tag";
   tag.textContent = "FAMILIA " + (CAT_ORDER.indexOf(catKey) + 1) + "/4";
+  const icon = catIconEl(catKey, "family-icon");
+  head.appendChild(tag);
+  head.appendChild(icon);
 
   const title = document.createElement("span");
   title.className = "family-card-title";
@@ -171,7 +231,7 @@ CAT_ORDER.forEach(function(catKey){
   count.className = "family-card-count";
   count.textContent = n + (n === 1 ? " falacia →" : " falacias →");
 
-  door.appendChild(tag);
+  door.appendChild(head);
   door.appendChild(title);
   door.appendChild(desc);
   door.appendChild(count);
@@ -266,7 +326,9 @@ function renderPresent(){
   const cat = CATS[f.cat];
   presentProgress.textContent = "Expediente " + (presentIndex+1) + " de " + FALLACIES.length + " · " + cat.label;
   presentBody.innerHTML =
-    '<span class="present-tag" style="background:' + catSoftBg(f.cat) + ';color:' + catColor(f.cat) + '">' + f.cat.toUpperCase() + '</span>' +
+    '<span class="present-tag" style="background:' + catSoftBg(f.cat) + ';color:' + catColor(f.cat) + '">' +
+      '<span class="family-icon present-tag-icon">' + catIconSvg(f.cat) + '</span>' + cat.label.toUpperCase() +
+    '</span>' +
     '<h2 class="present-name">' + escapeHtml(f.name) + '</h2>' +
     '<p class="present-hook">' + escapeHtml(f.hook) + '</p>' +
     '<div class="present-label">DEFINICIÓN</div>' +
@@ -607,15 +669,21 @@ function renderJournal(){
 
     const head = document.createElement("div");
     head.className = "skill-row-head";
+    const labelWrap = document.createElement("span");
+    labelWrap.className = "skill-row-label-wrap";
+    const icon = catIconEl(catKey, "family-icon skill-row-icon");
+    icon.style.color = catColor(catKey);
     const label = document.createElement("span");
     label.className = "skill-row-label";
     label.textContent = cat.label;
+    labelWrap.appendChild(icon);
+    labelWrap.appendChild(label);
     const pctSpan = document.createElement("span");
     pctSpan.className = "skill-row-pct";
     pctSpan.textContent = stats.total > 0
       ? stats.correct + " de " + stats.total + " · " + pct + "%"
       : "Sin casos esta ronda";
-    head.appendChild(label);
+    head.appendChild(labelWrap);
     head.appendChild(pctSpan);
 
     const track = document.createElement("div");

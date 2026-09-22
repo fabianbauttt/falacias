@@ -263,13 +263,15 @@
   .category-head{margin-bottom:14px;}
   .category-head .row{
     display:flex;
-    align-items:flex-start;
+    align-items:center;
     gap:10px;
   }
+  .category-icon{width:24px;height:24px;}
   .category-head h2{
     font-family:var(--font-display);
-    font-size:21px;
-    font-weight:600;
+    font-size:27px;
+    font-weight:700;
+    letter-spacing:-0.01em;
     margin:0;
   }
   .category-head .cat-desc{
@@ -282,7 +284,7 @@
     font-family:var(--font-mono);
     font-size:11px;
     font-weight:700;
-    letter-spacing:0.04em;
+    letter-spacing:0.06em;
     padding:4px 10px;
     border-radius:999px;
     white-space:nowrap;
@@ -303,7 +305,16 @@
   }
   .card{
     position:relative;
-    background:var(--glass-bg);
+    /* Antes .card usaba el mismo --glass-bg plano que cualquier otro panel;
+       esta capa extra de degradado (con el "soft" de la familia que ya
+       llega por --cat-soft-color, la misma variable que usa .example-clip)
+       tiñe la tarjeta apenas lo suficiente para que el color de familia no
+       viva solo en el borde superior de 4px. Se apila DEBAJO de --glass-bg
+       en vez de reemplazarlo, así el vidrio translúcido de siempre se
+       conserva igual. */
+    background:
+      linear-gradient(165deg, var(--cat-soft-color, transparent) 0%, transparent 60%),
+      var(--glass-bg);
     -webkit-backdrop-filter:var(--glass-blur);
     backdrop-filter:var(--glass-blur);
     border:1px solid var(--line);
@@ -313,6 +324,14 @@
       inset 0 1.5px 0 var(--glass-hilite),
       inset 0 -1px 0 var(--glass-shade),
       0 10px 26px var(--glass-drop);
+    transition:transform .15s ease, box-shadow .15s ease;
+  }
+  .card:hover{
+    transform:translateY(-3px);
+    box-shadow:
+      inset 0 1.5px 0 var(--glass-hilite),
+      inset 0 -1px 0 var(--glass-shade),
+      0 16px 32px var(--glass-drop);
   }
   .card-tab{
     display:block;
@@ -352,8 +371,9 @@
   .card-top-title{
     display:block;
     font-family:var(--font-display);
-    font-size:18px;
-    font-weight:600;
+    font-size:19px;
+    font-weight:700;
+    letter-spacing:-0.005em;
     color:var(--ink);
     margin:0 0 4px;
   }
@@ -364,13 +384,16 @@
     margin:2px 0 0;
   }
   .card .expand-icon{
-    font-family:var(--font-mono);
-    font-size:16px;
+    display:inline-flex;
+    width:18px;
+    height:18px;
     color:var(--ink-soft);
     transition:transform .15s ease;
     flex:none;
+    margin-top:2px;
   }
-  .card-top[aria-expanded="true"] .expand-icon{transform:rotate(45deg);}
+  .card .expand-icon svg{width:100%;height:100%;display:block;}
+  .card-top[aria-expanded="true"] .expand-icon{transform:rotate(180deg);}
   .card-detail{
     display:none;
     margin-top:12px;
@@ -426,7 +449,12 @@
     border-radius:22px;
     border:1px solid var(--line);
     border-top:4px solid var(--cat-color, var(--accent));
-    background:var(--glass-bg);
+    /* Mismo criterio que en .card: un degradado del "soft" de la familia
+       por debajo del vidrio, para que el color no viva solo en el borde
+       superior de 4px. */
+    background:
+      linear-gradient(165deg, var(--cat-soft-color, transparent) 0%, transparent 65%),
+      var(--glass-bg);
     -webkit-backdrop-filter:var(--glass-blur);
     backdrop-filter:var(--glass-blur);
     cursor:pointer;
@@ -434,17 +462,43 @@
       inset 0 1.5px 0 var(--glass-hilite),
       inset 0 -1px 0 var(--glass-shade),
       0 10px 26px var(--glass-drop);
-    transition:background .15s ease, transform .1s ease;
+    transition:background .15s ease, transform .15s ease, box-shadow .15s ease;
   }
-  .family-card:hover{background:rgba(255,255,255,.14);}
+  .family-card:hover{
+    background:
+      linear-gradient(165deg, var(--cat-soft-color, transparent) 0%, transparent 80%),
+      rgba(255,255,255,.14);
+    transform:translateY(-3px);
+    box-shadow:
+      inset 0 1.5px 0 var(--glass-hilite),
+      inset 0 -1px 0 var(--glass-shade),
+      0 16px 34px var(--glass-drop);
+  }
   .family-card:active{transform:scale(0.99);}
   .family-card:focus-visible{outline:2px solid var(--accent);outline-offset:3px;}
+  /* Envoltorio compartido por los 4 íconos de familia (bocadillo+X, megáfono,
+     matraz, dominós): el tamaño y el color se fijan por contexto más abajo
+     (aquí, en .category-icon, en .present-tag-icon y en .skill-row-icon),
+     el SVG interno no cambia. */
+  .family-icon{display:inline-flex;flex:none;}
+  .family-icon svg{width:100%;height:100%;display:block;}
+  .family-card-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    width:100%;
+  }
+  .family-card-head .family-icon{
+    width:26px;
+    height:26px;
+    color:var(--cat-color, var(--accent));
+  }
   .family-card-tag{
     display:block;
     font-family:var(--font-mono);
     font-size:11px;
     font-weight:700;
-    letter-spacing:0.04em;
+    letter-spacing:0.06em;
     color:var(--cat-color, var(--accent));
     opacity:.9;
   }
@@ -491,6 +545,7 @@
     align-items:center;
     font-family:var(--font-mono);
     font-size:12px;
+    letter-spacing:0.02em;
     color:var(--ink-soft);
     margin-bottom:16px;
     flex-wrap:wrap;
@@ -510,6 +565,13 @@
     padding:4px 10px;
     border-radius:999px;
     font-weight:700;
+    /* Se fija explícito en vez de depender de heredar de .practice-meta:
+       #journalTime usa esta misma clase dentro de .journal-meta, que no
+       tiene font-family:mono como ancestro, así que sin esto se quedaría
+       en la fuente de cuerpo (Manrope) mientras el resto de contadores de
+       la app (progreso, "X de Y" del Diario de Caza) son monoespaciados. */
+    font-family:var(--font-mono);
+    letter-spacing:0.02em;
   }
   /* Color propio (ámbar, el mismo tono de "andamiaje" de la retroalimentación)
      para distinguir visualmente el esfuerzo (persistencia) del logro
@@ -698,7 +760,20 @@
   @keyframes fadeSlideIn{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:translateY(0);}}
   @media (prefers-reduced-motion: reduce){
     .feedback.show, .card.open .card-detail, .opt-btn.correct, .opt-btn.wrong{animation:none;}
+    /* El "levitar" al pasar el mouse (.card, .family-card) usa transform,
+       no animation: sin esta regla, animation:none de la línea de arriba no
+       lo tocaría y el movimiento seguiría ahí para quien pidió menos
+       movimiento. La sombra más profunda del hover se conserva —no es
+       movimiento, solo comunica "esto es interactivo". */
+    .card:hover, .family-card:hover{transform:none;}
   }
+  /* .journal define su propia animación de aparición más abajo en este
+     archivo (junto al resto de estilos del Diario de Caza): la anulación
+     tiene que ir DESPUÉS de esa regla base para ganar la cascada (misma
+     especificidad, gana la que aparece más abajo — el mismo motivo por el
+     que .skill-bar-fill tiene su propio bloque reduced-motion pegado a su
+     regla base en vez de vivir aquí arriba). Se resuelve donde se define
+     .journal, no aquí. */
   .feedback.good{background:var(--good-soft);}
   .feedback.bad{background:var(--bad-soft);}
   .feedback.hint{background:var(--warn-soft);}
@@ -750,6 +825,20 @@
       inset 0 1.5px 0 var(--glass-hilite),
       inset 0 -1px 0 var(--glass-shade),
       0 10px 30px var(--glass-drop);
+    /* Al pasar de hidden a visible, el navegador vuelve a insertar este
+       nodo en el árbol de render, así que la animación se reproduce cada
+       vez que se termina una ronda (no solo la primera) sin que app.js
+       tenga que agregar ni quitar ninguna clase a mano. */
+    animation:journalReveal .45s ease;
+  }
+  @keyframes journalReveal{
+    from{opacity:0; transform:translateY(10px);}
+    to{opacity:1; transform:translateY(0);}
+  }
+  /* Va después de la regla base de .journal a propósito (ver el comentario
+     junto al resto de prefers-reduced-motion más arriba). */
+  @media (prefers-reduced-motion: reduce){
+    .journal{animation:none;}
   }
   /* Misma convención defensiva que #practiceFrame[hidden] de arriba. */
   .journal[hidden]{display:none;}
@@ -783,6 +872,8 @@
     margin-bottom:6px;
     flex-wrap:wrap;
   }
+  .skill-row-label-wrap{display:flex;align-items:center;gap:8px;}
+  .skill-row-icon{width:18px;height:18px;}
   .skill-row-label{
     font-family:var(--font-display);
     font-weight:600;
@@ -804,8 +895,13 @@
   .skill-bar-fill{
     height:100%;
     border-radius:999px;
-    background:var(--cat-color, var(--accent));
-    transition:width .6s ease;
+    /* Un brillo diagonal sutil (blanco translúcido, se desvanece al 70%)
+       por encima del color plano de la familia: la barra deja de ser un
+       bloque de color uniforme sin depender de --cat-color-light (que no
+       existe como variable, para no duplicar la paleta ya definida). */
+    background:
+      linear-gradient(100deg, rgba(255,255,255,.35), rgba(255,255,255,0) 70%),
+      var(--cat-color, var(--accent));
   }
   /* .skill-bar-fill anima con "transition" (el ancho lo fija app.js
      directamente), no con "animation" como las reglas del bloque
@@ -888,9 +984,14 @@
     letter-spacing:0.05em;
     padding:5px 12px;
     border-radius:999px;
-    display:inline-block;
+    display:inline-flex;
+    align-items:center;
+    gap:7px;
     width:fit-content;
   }
+  /* Sin color propio: hereda el de .present-tag (fijado inline por familia),
+     así el ícono siempre coincide con el color del texto que acompaña. */
+  .present-tag-icon{width:14px;height:14px;}
   .present-name{
     font-family:var(--font-display);
     font-weight:700;
@@ -949,10 +1050,40 @@
   .ghost-btn:disabled, .next-btn:disabled{opacity:0.3;cursor:default;}
 
   /* Pantalla de bienvenida ("¿Qué es una falacia?") */
+  #welcomeOverlay .present-body{position:relative;}
   #welcomeOverlay .present-text{margin:0 0 14px;}
   #welcomeOverlay .present-text:last-of-type{margin-bottom:0;}
-  .welcome-title{font-size:clamp(26px,4.5vw,42px);margin-bottom:18px;}
+  .welcome-title{font-size:clamp(26px,4.5vw,42px);margin-bottom:18px;position:relative;}
   .welcome-actions{display:flex;justify-content:flex-end;margin-top:22px;}
+  /* Marca de agua decorativa: reutiliza el mismo dibujo de la lupa del
+     logo del encabezado (mismo <svg>, mismos valores de círculo+línea) en
+     vez de un ícono nuevo, para que esta pantalla —la más cargada de texto
+     seguido de toda la app— tenga al menos un elemento gráfico propio sin
+     inventar un motivo visual distinto del que ya representa la marca.
+     pointer-events:none + aria-hidden porque es puramente decorativa. */
+  .welcome-watermark{
+    position:absolute;
+    top:-10px;
+    right:-10px;
+    width:200px;
+    height:200px;
+    color:var(--accent);
+    opacity:.07;
+    pointer-events:none;
+  }
+  @media (max-width:640px){
+    .welcome-watermark{width:130px;height:130px;}
+  }
+  /* Resalta los dos términos que esta pantalla define (argumento, falacia)
+     como un chip de color en vez de solo negrita, para que se distingan de
+     un énfasis cualquiera dentro del párrafo. */
+  .term-chip{
+    color:var(--accent);
+    background:var(--accent-soft);
+    padding:1px 8px;
+    border-radius:6px;
+    font-weight:700;
+  }
 
   @media (max-width:480px){
     header.top{flex-direction:column;}
