@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cazafalacias</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <span class="icon-glass">
+        <svg viewBox="0 0 48 48" fill="none" aria-hidden="true">
+          <circle cx="20" cy="20" r="13" stroke="var(--ink)" stroke-width="3.5"/>
+          <line x1="29.5" y1="29.5" x2="42" y2="42" stroke="var(--ink)" stroke-width="4.5" stroke-linecap="round"/>
+          <path d="M14 20a6 6 0 0 1 6-6" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <div>
+        <h1>Cazafalacias</h1>
+        <p>FILOSOFÍA · GRADO DÉCIMO · UNIDAD DE ARGUMENTACIÓN</p>
+      </div>
+    </div>
+    <div class="top-controls">
+      <button class="toggle-btn" id="aboutBtn" type="button">¿Qué es una falacia?</button>
+      <button class="toggle-btn" id="projBtn" aria-pressed="false" type="button">Modo proyección</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- role="tablist" reemplaza por completo la semántica nativa de <nav>
+         (ya no se expone como landmark de navegación, sino como tablist), así
+         que vive dentro de <main> junto con los paneles que controla, en vez
+         de quedar suelto entre landmarks como si fuera navegación del sitio. -->
+    <nav class="tabs" role="tablist">
+      <button role="tab" id="tab-catalogo" aria-selected="true" aria-controls="view-catalogo" type="button">Catálogo</button>
+      <button role="tab" id="tab-practica" aria-selected="false" aria-controls="view-practica" type="button">Práctica</button>
+    </nav>
+
+    <section class="view active" id="view-catalogo" role="tabpanel" aria-labelledby="tab-catalogo">
+      <p class="intro">Doce falacias comunes, agrupadas en cuatro familias según <strong>cómo</strong> engañan: distrayendo del argumento, presionando socialmente, torciendo la evidencia o forzando la estructura lógica. Elige una familia para ver sus expedientes, o usa "Modo proyección" para revisarlas todas, una por una, con el curso.</p>
+      <div id="familySelectorRoot" class="family-grid"></div>
+      <div class="family-back-row" id="familyBackRow" hidden>
+        <button class="ghost-btn" id="familyBackBtn" type="button">← Todas las familias</button>
+      </div>
+      <div id="catalog-root"></div>
+    </section>
+
+    <section class="view" id="view-practica" role="tabpanel" aria-labelledby="tab-practica">
+      <div class="practice-frame">
+        <div class="practice-meta">
+          <span id="progressLabel">Caso 1 de 36</span>
+          <div class="score-group">
+            <span class="score-pill" id="scoreLabel">Puntos de Análisis Crítico: 0</span>
+            <span class="score-pill persistence-pill" id="attemptsLabel">Persistencia: 0 intentos</span>
+          </div>
+        </div>
+        <div class="statement" id="statementText">Cargando...</div>
+        <div class="options" id="optionsRoot"></div>
+        <div class="feedback" id="feedbackBox" aria-live="polite" aria-atomic="true">
+          <div class="verdict" id="feedbackVerdict"></div>
+          <div id="feedbackBody"></div>
+        </div>
+        <div class="next-row">
+          <button class="next-btn" id="nextBtn" type="button" disabled>Siguiente caso →</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="note">Ni el catálogo ni la práctica califican ni guardan resultados: son para pensar en voz alta y para equivocarse sin miedo. Cada falacia cierra con la razón exacta por la que el argumento falla.</footer>
+</div>
+
+<div class="present-overlay" id="presentOverlay" role="dialog" aria-modal="true" aria-label="Presentación de falacias, una por una" hidden>
+  <div class="present-bar">
+    <span id="presentProgress">Expediente 1 de 12</span>
+    <button class="toggle-btn" id="presentClose" type="button">Cerrar ✕</button>
+  </div>
+  <div class="present-body" id="presentBody"></div>
+  <div class="present-controls">
+    <button class="ghost-btn" id="presentPrev" type="button">← Anterior</button>
+    <button class="next-btn" id="presentNext" type="button">Siguiente →</button>
+  </div>
+</div>
+
+<div class="present-overlay" id="welcomeOverlay" role="dialog" aria-modal="true" aria-labelledby="welcomeTitle" hidden>
+  <div class="present-bar">
+    <span>Antes de empezar</span>
+    <button class="toggle-btn" id="welcomeClose" type="button">Cerrar ✕</button>
+  </div>
+  <div class="present-body">
+    <h2 class="present-name welcome-title" id="welcomeTitle">¿Qué es una falacia?</h2>
+    <p class="present-text">Un <strong>argumento</strong> es un intento de sostener una conclusión con razones: unas ideas (premisas) que deberían apoyar otra idea, la conclusión. Cuando las razones sí la sostienen, el argumento es bueno. Cuando no la sostienen —aunque suene convincente— hay un error en el razonamiento.</p>
+    <p class="present-text">Una <strong>falacia</strong> es justamente eso: un argumento que parece válido, que puede sonar persuasivo o incluso ganarse una discusión, pero que en realidad no logra apoyar su conclusión con razones reales. En vez de dar evidencia, distrae, presiona, tuerce la evidencia o fuerza la estructura del argumento.</p>
+    <p class="present-text">Reconocerlas sirve para dos cosas: no dejarte convencer por trucos retóricos —en una discusión, en redes sociales, en publicidad, en política— y para argumentar mejor tú mismo, sin caer en los mismos errores.</p>
+    <p class="present-text">A continuación vas a explorar doce falacias comunes, agrupadas en cuatro familias según <strong>cómo</strong> engañan.</p>
+    <div class="welcome-actions">
+      <button class="next-btn" id="welcomeStart" type="button">Empezar →</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js" type="module"></script>
+</body>
+</html>

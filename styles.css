@@ -1,0 +1,790 @@
+  :root{
+    /* Aurora nocturna: cielo nocturno + bandas de aurora (rosa/verde/azul/violeta),
+       vidrio traslúcido oscuro con brillo especular, siguiendo el mismo espíritu
+       que la opción 5 (Aurora pastel) pero como luz sobre un fondo oscuro. */
+    /* La plataforma que aloja esta página parte de color-scheme:light; sin este
+       override, el navegador dibuja controles y barra de desplazamiento nativos
+       con tema claro sobre un fondo oscuro. */
+    color-scheme: dark;
+    --night-1:#241a42;
+    --night-2:#150f2e;
+    --night-3:#08061a;
+    --night-4:#030309;
+    --paper:#0D0A1F;
+    --ink:#F3EEFF;
+    --ink-soft:#C9C0E8;
+    --line:rgba(255,255,255,.40);
+
+    --glass-bg:rgba(255,255,255,.09);
+    --glass-bg-strong:rgba(9,7,20,.86);
+    --glass-blur:blur(20px) saturate(170%);
+    --glass-hilite:rgba(255,255,255,.32);
+    --glass-shade:rgba(255,255,255,.05);
+    --glass-drop:rgba(0,0,0,.5);
+
+    --accent:#D9B8FF;
+    --accent-ink:#241A42;
+    --accent-soft:rgba(217,184,255,.16);
+    --accent-grad:linear-gradient(135deg,#C7A8FF,#FFB6D5);
+    --tab-text:#241A42;
+
+    /* Las 4 familias tomadas de los colores reales de una aurora boreal:
+       rosa/rojo, verde, azul y violeta. */
+    --cat1:#FF8FAE;
+    --cat1-soft:rgba(255,143,174,.16);
+    --cat2:#63D9C9;
+    --cat2-soft:rgba(99,217,201,.16);
+    --cat3:#7EC8FF;
+    --cat3-soft:rgba(126,200,255,.16);
+    --cat4:#C7A8FF;
+    --cat4-soft:rgba(199,168,255,.16);
+
+    --good:#7EEAB3;
+    --good-soft:rgba(126,234,179,.16);
+    --bad:#FF8080;
+    --bad-soft:rgba(255,128,128,.16);
+    /* Estado de andamiaje ("pista, intenta de nuevo") del sistema de dos
+       intentos en Práctica: deliberadamente distinto de --good (acierto)
+       y --bad (caso cerrado sin acierto), para que el color por sí solo
+       comunique "todavía puedes corregir" y no "ya terminó, perdiste".
+       Contraste verificado ≥13:1 contra el fondo más oscuro de la
+       plataforma (cálculo WCAG real, no estimado). */
+    --warn:#FFD479;
+    --warn-soft:rgba(255,212,121,.16);
+
+    --font-display:'Fredoka', Georgia, sans-serif;
+    --font-body:'Manrope', -apple-system, Segoe UI, sans-serif;
+    --font-mono:'IBM Plex Mono', 'Courier New', monospace;
+  }
+  /* Accesibilidad: quien pide menos transparencia recibe paneles casi
+     opacos y sin desenfoque, en vez del vidrio líquido. */
+  @media (prefers-reduced-transparency: reduce){
+    :root{
+      --glass-bg:#1B1638;
+      --glass-bg-strong:#0D0A1F;
+      --glass-blur:none;
+      --glass-hilite:rgba(255,255,255,.14);
+      --glass-shade:rgba(0,0,0,.25);
+    }
+  }
+
+  *{box-sizing:border-box;}
+  html{background:var(--night-4);}
+  body{
+    margin:0;
+    background:
+      radial-gradient(circle at 25% 8%, var(--night-1) 0%, var(--night-2) 45%, var(--night-3) 80%, var(--night-4) 100%);
+    background-attachment:fixed;
+    color:var(--ink);
+    font-family:var(--font-body);
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+  /* Campo de estrellas fijo, muy sutil */
+  body::before{
+    content:"";
+    position:fixed;
+    inset:0;
+    z-index:-2;
+    opacity:.5;
+    pointer-events:none;
+    background-repeat:repeat;
+    background-size:480px 620px;
+    background-image:
+      radial-gradient(1.5px 1.5px at 8% 12%, #fff 100%, transparent),
+      radial-gradient(1px 1px at 22% 38%, #fff 100%, transparent),
+      radial-gradient(1.5px 1.5px at 40% 6%, #fff 100%, transparent),
+      radial-gradient(1px 1px at 63% 24%, #fff 100%, transparent),
+      radial-gradient(1.5px 1.5px at 78% 52%, #fff 100%, transparent),
+      radial-gradient(1px 1px at 12% 68%, #fff 100%, transparent),
+      radial-gradient(1.5px 1.5px at 33% 82%, #fff 100%, transparent),
+      radial-gradient(1px 1px at 58% 90%, #fff 100%, transparent),
+      radial-gradient(1.5px 1.5px at 88% 78%, #fff 100%, transparent),
+      radial-gradient(1px 1px at 95% 15%, #fff 100%, transparent);
+  }
+  /* Bandas de aurora: manchas de luz difusas, fijas respecto al viewport.
+     El lienzo se limita a un ancho máximo y queda centrado: en una pantalla
+     muy ancha (TV o proyector de salón) las manchas se quedan cerca del
+     contenido en vez de irse a las esquinas reales de la pantalla, lejos
+     de todo lo que se está leyendo. */
+  body::after{
+    content:"";
+    position:fixed;
+    top:-10%;
+    bottom:-10%;
+    left:50%;
+    width:min(1500px, 120vw);
+    transform:translateX(-50%);
+    z-index:-1;
+    pointer-events:none;
+    filter:blur(60px);
+    background-repeat:no-repeat;
+    background-image:
+      radial-gradient(360px 360px at 12% 10%, rgba(199,168,255,.30), transparent 70%),
+      radial-gradient(320px 320px at 85% 18%, rgba(99,217,201,.24), transparent 70%),
+      radial-gradient(380px 380px at 18% 85%, rgba(255,143,174,.22), transparent 70%),
+      radial-gradient(300px 300px at 90% 88%, rgba(126,200,255,.20), transparent 70%);
+  }
+  @media (prefers-reduced-transparency: reduce){
+    body::before, body::after{display:none;}
+    .statement{background:#08061a;-webkit-backdrop-filter:none;backdrop-filter:none;}
+  }
+  .wrap{
+    position:relative;
+    max-width:920px;
+    margin:0 auto;
+    padding:28px 16px 80px;
+  }
+  header.top{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:16px;
+    padding-bottom:20px;
+    border-bottom:1px solid var(--line);
+    margin-bottom:24px;
+  }
+  .brand{display:flex;align-items:center;gap:12px;}
+  .brand .icon-glass{
+    flex:none;
+    width:44px;
+    height:44px;
+    border-radius:14px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:var(--glass-bg);
+    -webkit-backdrop-filter:var(--glass-blur);
+    backdrop-filter:var(--glass-blur);
+    border:1px solid var(--line);
+    box-shadow:
+      inset 0 1.5px 0 var(--glass-hilite),
+      inset 0 -1px 0 var(--glass-shade),
+      0 8px 20px var(--glass-drop);
+  }
+  .brand svg{flex:none;width:22px;height:22px;}
+  .brand h1{
+    font-family:var(--font-display);
+    font-weight:700;
+    font-size:clamp(26px,5vw,36px);
+    margin:0;
+    letter-spacing:-0.01em;
+  }
+  .brand p{
+    margin:2px 0 0;
+    font-size:12.5px;
+    color:var(--ink-soft);
+    font-family:var(--font-mono);
+    letter-spacing:0.03em;
+  }
+  .top-controls{display:flex;gap:8px;flex-wrap:wrap;align-self:center;}
+  button{font-family:var(--font-body);}
+  .toggle-btn{
+    border:1px solid var(--line);
+    background:var(--glass-bg);
+    -webkit-backdrop-filter:var(--glass-blur);
+    backdrop-filter:var(--glass-blur);
+    color:var(--ink);
+    padding:8px 16px;
+    border-radius:999px;
+    font-size:13px;
+    font-weight:700;
+    cursor:pointer;
+    box-shadow:
+      inset 0 1.5px 0 var(--glass-hilite),
+      inset 0 -1px 0 var(--glass-shade),
+      0 6px 16px var(--glass-drop);
+    transition:background .15s ease, color .15s ease, box-shadow .15s ease;
+  }
+  .toggle-btn:focus-visible, nav.tabs button:focus-visible, .opt-btn:focus-visible,
+  .next-btn:focus-visible, .ghost-btn:focus-visible, #statementText:focus-visible{
+    outline:2px solid var(--accent);
+    outline-offset:2px;
+  }
+  .toggle-btn[aria-pressed="true"]{
+    background:var(--accent-grad);
+    color:var(--accent-ink);
+    border-color:transparent;
+  }
+  .toggle-btn:hover{background:rgba(255,255,255,.17);border-color:var(--accent);}
+  .toggle-btn[aria-pressed="true"]:hover{filter:brightness(1.08);border-color:transparent;}
+  nav.tabs{
+    display:flex;
+    gap:4px;
+    max-width:420px;
+    margin-bottom:28px;
+    padding:4px;
+    background:var(--glass-bg);
+    -webkit-backdrop-filter:var(--glass-blur);
+    backdrop-filter:var(--glass-blur);
+    border:1px solid var(--line);
+    border-radius:999px;
+    box-shadow:
+      inset 0 1.5px 0 var(--glass-hilite),
+      inset 0 -1px 0 var(--glass-shade),
+      0 10px 24px var(--glass-drop);
+  }
+  nav.tabs button{
+    flex:1;
+    background:none;
+    border:none;
+    border-radius:999px;
+    padding:11px 6px;
+    margin:0;
+    font-size:15px;
+    font-weight:700;
+    color:var(--ink-soft);
+    cursor:pointer;
+    transition:background .18s ease, color .18s ease, box-shadow .18s ease;
+  }
+  nav.tabs button[aria-selected="true"]{
+    color:var(--accent-ink);
+    background:var(--accent-grad);
+    box-shadow:0 6px 16px var(--glass-drop);
+  }
+  nav.tabs button:hover:not([aria-selected="true"]){
+    color:var(--ink);
+    background:rgba(255,255,255,.09);
+  }
+  .view{display:none;}
+  .view.active{display:block;}
+
+  .intro{
+    font-size:16px;
+    color:var(--ink-soft);
+    max-width:62ch;
+    margin:0 0 30px;
+  }
+  .intro strong{color:var(--ink);}
+
+  section.category{margin-bottom:38px;}
+  .category-head{margin-bottom:14px;}
+  .category-head .row{
+    display:flex;
+    align-items:flex-start;
+    gap:10px;
+  }
+  .category-head h2{
+    font-family:var(--font-display);
+    font-size:21px;
+    font-weight:600;
+    margin:0;
+  }
+  .category-head .cat-desc{
+    font-size:14px;
+    color:var(--ink-soft);
+    max-width:64ch;
+    margin:6px 0 0;
+  }
+  .cat-tag{
+    font-family:var(--font-mono);
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:0.04em;
+    padding:4px 10px;
+    border-radius:999px;
+    white-space:nowrap;
+  }
+  .cards{
+    display:grid;
+    grid-template-columns:1fr;
+    align-items:start;
+    column-gap:12px;
+    row-gap:26px;
+    padding-top:14px;
+  }
+  @media (min-width:720px){
+    /* Cada familia tiene siempre 3 expedientes: se salta el estado de
+       2 columnas a propósito, para que nunca quede uno huérfano solo
+       en su fila con un hueco vacío al lado. */
+    .cards{grid-template-columns:repeat(3,1fr);}
+  }
+  .card{
+    position:relative;
+    background:var(--glass-bg);
+    -webkit-backdrop-filter:var(--glass-blur);
+    backdrop-filter:var(--glass-blur);
+    border:1px solid var(--line);
+    border-radius:22px;
+    padding:18px 18px 16px;
+    box-shadow:
+      inset 0 1.5px 0 var(--glass-hilite),
+      inset 0 -1px 0 var(--glass-shade),
+      0 10px 26px var(--glass-drop);
+  }
+  .card-tab{
+    display:block;
+    color:var(--cat-color, var(--accent));
+    font-family:var(--font-mono);
+    font-size:10.5px;
+    font-weight:700;
+    letter-spacing:0.06em;
+    margin-bottom:10px;
+    opacity:.9;
+  }
+  .card-top{
+    display:flex;
+    width:100%;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:8px;
+    background:none;
+    border:none;
+    padding:0;
+    margin:0;
+    font:inherit;
+    color:inherit;
+    text-align:left;
+    cursor:pointer;
+  }
+  .card-top:focus-visible{outline:2px solid var(--accent);outline-offset:3px;}
+  .card-top:hover .card-top-title{color:var(--accent);}
+  .card-top:hover .expand-icon{color:var(--accent);}
+  /* El <h3> envuelve al <button>, no al revés: un <button> solo admite
+     contenido "de frase" (spans, texto), nunca encabezados ni párrafos.
+     El h3 no aporta tipografía propia (eso vive en .card-top-title) — solo
+     conserva el rol de encabezado para quien navega por encabezados con
+     lector de pantalla. */
+  .card-top-heading{margin:0;font:inherit;}
+  .card-top-text{display:block;}
+  .card-top-title{
+    display:block;
+    font-family:var(--font-display);
+    font-size:18px;
+    font-weight:600;
+    color:var(--ink);
+    margin:0 0 4px;
+  }
+  .card .hook{
+    display:block;
+    font-size:13.5px;
+    color:var(--ink-soft);
+    margin:2px 0 0;
+  }
+  .card .expand-icon{
+    font-family:var(--font-mono);
+    font-size:16px;
+    color:var(--ink-soft);
+    transition:transform .15s ease;
+    flex:none;
+  }
+  .card-top[aria-expanded="true"] .expand-icon{transform:rotate(45deg);}
+  .card-detail{
+    display:none;
+    margin-top:12px;
+    padding-top:12px;
+    border-top:1px dashed var(--line);
+    font-size:14.5px;
+  }
+  /* .card-detail ya no es hermano directo de .card-top (ahora hay un <h3>
+     entre medio), así que en vez de un combinador de hermanos se usa una
+     clase en la tarjeta completa, que el JS alterna junto con aria-expanded. */
+  .card.open .card-detail{display:block;animation:fadeSlideIn .18s ease;}
+  .card-detail .label{
+    font-family:var(--font-mono);
+    font-size:11px;
+    font-weight:600;
+    color:var(--ink-soft);
+    letter-spacing:0.04em;
+    margin:10px 0 4px;
+  }
+  .card-detail .label:first-child{margin-top:0;}
+  .example-clip{
+    background:var(--cat-soft-color, var(--accent-soft));
+    border-radius:12px;
+    padding:12px 14px;
+    font-style:italic;
+    color:var(--ink);
+  }
+
+  /* Selector de familias: pantalla intermedia del Catálogo — se elige una
+     familia antes de ver sus 3 expedientes, en vez de un solo scroll largo
+     con las 4 familias seguidas. */
+  .family-grid{
+    display:grid;
+    grid-template-columns:1fr;
+    gap:16px;
+    margin-bottom:8px;
+  }
+  /* Una regla de autor con "display" le gana en cascada al [hidden] del
+     navegador sin importar el atributo, así que hay que reafirmarlo aquí
+     explícitamente (mismo caso que .present-overlay[hidden] más abajo). */
+  .family-grid[hidden]{display:none;}
+  @media (min-width:640px){
+    .family-grid{grid-template-columns:repeat(2,1fr);}
+  }
+  .family-card-heading{margin:0;font:inherit;}
+  .family-card{
+    display:flex;
+    flex-direction:column;
+    align-items:flex-start;
+    width:100%;
+    text-align:left;
+    padding:22px 22px 20px;
+    border-radius:22px;
+    border:1px solid var(--line);
+    border-top:4px solid var(--cat-color, var(--accent));
+    background:var(--glass-bg);
+    -webkit-backdrop-filter:var(--glass-blur);
+    backdrop-filter:var(--glass-blur);
+    cursor:pointer;
+    box-shadow:
+      inset 0 1.5px 0 var(--glass-hilite),
+      inset 0 -1px 0 var(--glass-shade),
+      0 10px 26px var(--glass-drop);
+    transition:background .15s ease, transform .1s ease;
+  }
+  .family-card:hover{background:rgba(255,255,255,.14);}
+  .family-card:active{transform:scale(0.99);}
+  .family-card:focus-visible{outline:2px solid var(--accent);outline-offset:3px;}
+  .family-card-tag{
+    display:block;
+    font-family:var(--font-mono);
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:0.04em;
+    color:var(--cat-color, var(--accent));
+    opacity:.9;
+  }
+  .family-card-title{
+    display:block;
+    font-family:var(--font-display);
+    font-size:22px;
+    font-weight:600;
+    color:var(--ink);
+    margin-top:6px;
+  }
+  .family-card-desc{
+    display:block;
+    font-size:14px;
+    color:var(--ink-soft);
+    margin-top:8px;
+  }
+  .family-card-count{
+    display:block;
+    font-family:var(--font-mono);
+    font-size:12px;
+    font-weight:700;
+    color:var(--cat-color, var(--accent));
+    margin-top:16px;
+  }
+  .family-back-row{margin-bottom:18px;}
+
+  /* Practice view */
+  .practice-frame{
+    background:var(--glass-bg);
+    -webkit-backdrop-filter:var(--glass-blur);
+    backdrop-filter:var(--glass-blur);
+    border:1px solid var(--line);
+    border-radius:26px;
+    padding:26px;
+    box-shadow:
+      inset 0 1.5px 0 var(--glass-hilite),
+      inset 0 -1px 0 var(--glass-shade),
+      0 10px 30px var(--glass-drop);
+  }
+  .practice-meta{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    font-family:var(--font-mono);
+    font-size:12px;
+    color:var(--ink-soft);
+    margin-bottom:16px;
+    flex-wrap:wrap;
+    gap:8px;
+  }
+  /* Agrupa los dos indicadores (puntos de análisis crítico + persistencia)
+     como un solo bloque dentro de .practice-meta, que sigue repartiendo
+     "progreso" a la izquierda y "logros" a la derecha con space-between. */
+  .score-group{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+  }
+  .score-pill{
+    background:var(--accent-soft);
+    color:var(--accent);
+    padding:4px 10px;
+    border-radius:999px;
+    font-weight:700;
+  }
+  /* Color propio (ámbar, el mismo tono de "andamiaje" de la retroalimentación)
+     para distinguir visualmente el esfuerzo (persistencia) del logro
+     (puntos): contraste verificado ≥9.8:1 contra el fondo compuesto más
+     oscuro de la plataforma. */
+  .score-pill.persistence-pill{
+    background:var(--warn-soft);
+    color:var(--warn);
+  }
+  .statement{
+    font-family:var(--font-display);
+    font-weight:500;
+    font-size:clamp(19px,3vw,25px);
+    line-height:1.4;
+    padding:18px 20px;
+    background:rgba(3,3,9,.55);
+    -webkit-backdrop-filter:blur(6px);
+    backdrop-filter:blur(6px);
+    border:1px solid var(--line);
+    border-radius:16px;
+    margin-bottom:20px;
+    position:relative;
+    box-shadow:
+      inset 0 2px 10px rgba(0,0,0,.5),
+      inset 0 1px 0 rgba(255,255,255,.06);
+  }
+  .statement::before{
+    content:"“";
+    font-family:var(--font-display);
+    color:var(--accent);
+    font-size:1.3em;
+    margin-right:2px;
+  }
+  .statement::after{content:"”";font-family:var(--font-display);color:var(--accent);font-size:1.3em;}
+  .options{
+    display:grid;
+    grid-template-columns:1fr;
+    align-items:start;
+    gap:10px;
+    margin-bottom:16px;
+  }
+  @media (min-width:480px){
+    /* Siempre son 4 opciones: 2 columnas parejas (2+2), nunca 3+1. */
+    .options{grid-template-columns:repeat(2,1fr);}
+  }
+  @media (min-width:820px){
+    .options{grid-template-columns:repeat(4,1fr);}
+  }
+  .opt-btn{
+    display:flex;
+    align-items:baseline;
+    gap:8px;
+    text-align:left;
+    padding:12px 14px;
+    border-radius:14px;
+    border:1.5px solid var(--line);
+    background:var(--glass-bg);
+    -webkit-backdrop-filter:var(--glass-blur);
+    backdrop-filter:var(--glass-blur);
+    color:var(--ink);
+    font-size:14.5px;
+    font-weight:600;
+    cursor:pointer;
+    box-shadow:
+      inset 0 1.5px 0 var(--glass-hilite),
+      inset 0 -1px 0 var(--glass-shade);
+  }
+  .opt-btn .opt-letter{
+    font-family:var(--font-mono);
+    font-size:12px;
+    font-weight:700;
+    color:var(--ink-soft);
+    flex:none;
+  }
+  .opt-btn{transition:background-color .15s ease, border-color .15s ease, opacity .15s ease, transform .1s ease;}
+  .opt-btn:hover:not(:disabled){border-color:var(--accent);background:rgba(255,255,255,.14);}
+  .opt-btn:active:not(:disabled){transform:scale(0.98);}
+  .opt-btn:disabled{cursor:default;}
+  .opt-btn:disabled:not(.correct):not(.wrong){opacity:0.5;}
+  .opt-btn.correct{background:var(--good-soft);border-color:var(--good);color:var(--good);}
+  .opt-btn.correct .opt-letter{color:var(--good);}
+  .opt-btn.wrong{background:var(--bad-soft);border-color:var(--bad);color:var(--bad);}
+  .opt-btn.wrong .opt-letter{color:var(--bad);}
+  /* display:none sacaba este contenedor aria-live="polite" por completo
+     del árbol de accesibilidad. Si el texto se inserta (handleAnswer) en
+     el mismo instante en que pasa a visible, varios lectores de pantalla
+     "no llegan a tiempo" a registrar el nodo como parte del árbol antes de
+     que su contenido cambie, y se pierden el anuncio: es una condición de
+     carrera, no algo que dependa de la rapidez del código. visibility:hidden
+     tiene el mismo problema (también excluye el nodo del árbol de
+     accesibilidad en la mayoría de navegadores), así que tampoco sirve.
+     La solución robusta es la técnica clásica "visually hidden": el
+     contenedor queda SIEMPRE presente en el árbol de accesibilidad —recortado
+     a 1x1px y fuera del flujo normal cuando está inactivo, en vez de
+     ausente— y solo se le agrega texto nuevo cuando ya existe como nodo
+     estable. font-size se deja en la regla base porque no afecta el
+     tamaño de la caja recortada. */
+  .feedback{
+    font-size:14.5px;
+    position:absolute;
+    width:1px;
+    height:1px;
+    margin:0;
+    padding:0;
+    border:0;
+    overflow:hidden;
+    clip:rect(0 0 0 0);
+    clip-path:inset(50%);
+    white-space:nowrap;
+  }
+  .feedback.show{
+    position:static;
+    width:auto;
+    height:auto;
+    margin-bottom:16px;
+    padding:14px 16px;
+    border-radius:16px;
+    overflow:visible;
+    clip:auto;
+    clip-path:none;
+    white-space:normal;
+    animation:fadeSlideIn .2s ease;
+  }
+  @keyframes fadeSlideIn{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:translateY(0);}}
+  @media (prefers-reduced-motion: reduce){
+    .feedback.show, .card.open .card-detail{animation:none;}
+  }
+  .feedback.good{background:var(--good-soft);}
+  .feedback.bad{background:var(--bad-soft);}
+  .feedback.hint{background:var(--warn-soft);}
+  .feedback .verdict{font-weight:700;margin-bottom:8px;}
+  .feedback.good .verdict{color:var(--good);}
+  .feedback.bad .verdict{color:var(--bad);}
+  .feedback.hint .verdict{color:var(--warn);}
+  .feedback p{margin:0 0 8px;}
+  .feedback p:last-child{margin-bottom:0;}
+  .next-row{display:flex;justify-content:flex-end;}
+  .next-btn{
+    background:var(--accent-grad);
+    color:var(--accent-ink);
+    border:none;
+    padding:12px 22px;
+    border-radius:999px;
+    font-size:14px;
+    font-weight:800;
+    cursor:pointer;
+    box-shadow:0 10px 24px var(--glass-drop);
+    transition:opacity .15s ease, transform .1s ease;
+  }
+  .next-btn:disabled{opacity:0.35;cursor:default;}
+  .next-btn:hover:not(:disabled){filter:brightness(1.08);}
+  .next-btn:active:not(:disabled){transform:scale(0.97);}
+
+  footer.note{
+    margin-top:40px;
+    font-size:12.5px;
+    color:var(--ink-soft);
+    border-top:1px solid var(--line);
+    padding-top:14px;
+  }
+
+  /* Projection mode (Práctica view: enlarge in place, it's already one-case-at-a-time) */
+  body.projection .wrap{max-width:1100px;}
+  body.projection .practice-meta{font-size:15px;}
+  body.projection .statement{font-size:clamp(24px,4vw,34px);padding:26px 28px;}
+  body.projection .opt-btn{font-size:18px;padding:16px 18px;}
+  body.projection .feedback{font-size:17px;}
+  body.projection nav.tabs button{font-size:19px;}
+
+  /* Presentation overlay (Catálogo view: one expediente at a time) */
+  .present-overlay{
+    position:fixed;
+    inset:0;
+    z-index:100;
+    background:var(--glass-bg-strong);
+    -webkit-backdrop-filter:var(--glass-blur);
+    backdrop-filter:var(--glass-blur);
+    display:flex;
+    flex-direction:column;
+    padding:22px 22px calc(22px + env(safe-area-inset-bottom,0px));
+  }
+  .present-overlay[hidden]{display:none;}
+  .present-bar{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    font-family:var(--font-mono);
+    font-size:13px;
+    color:var(--ink-soft);
+    margin-bottom:18px;
+  }
+  .present-body{
+    flex:1;
+    overflow:auto;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    max-width:780px;
+    width:100%;
+    margin:0 auto;
+  }
+  .present-tag{
+    font-family:var(--font-mono);
+    font-size:12px;
+    font-weight:700;
+    letter-spacing:0.05em;
+    padding:5px 12px;
+    border-radius:999px;
+    display:inline-block;
+    width:fit-content;
+  }
+  .present-name{
+    font-family:var(--font-display);
+    font-weight:700;
+    font-size:clamp(30px,6vw,58px);
+    line-height:1.05;
+    margin:12px 0 8px;
+    text-wrap:balance;
+  }
+  .present-hook{
+    font-size:clamp(16px,2.2vw,21px);
+    color:var(--ink-soft);
+    margin:0 0 20px;
+  }
+  .present-label{
+    font-family:var(--font-mono);
+    font-size:12.5px;
+    font-weight:700;
+    color:var(--ink-soft);
+    letter-spacing:0.05em;
+    margin:16px 0 6px;
+  }
+  .present-text{
+    font-size:clamp(17px,2vw,21px);
+    line-height:1.5;
+  }
+  .present-example{
+    background:var(--cat-soft-color, var(--accent-soft));
+    border-radius:16px;
+    padding:16px 20px;
+    font-style:italic;
+    font-size:clamp(17px,2vw,21px);
+    margin-top:4px;
+  }
+  .present-controls{
+    display:flex;
+    justify-content:space-between;
+    gap:12px;
+    margin-top:20px;
+  }
+  .ghost-btn{
+    background:var(--glass-bg);
+    -webkit-backdrop-filter:var(--glass-blur);
+    backdrop-filter:var(--glass-blur);
+    color:var(--ink);
+    border:1px solid var(--line);
+    padding:11px 20px;
+    border-radius:999px;
+    font-size:14px;
+    font-weight:700;
+    cursor:pointer;
+    box-shadow:
+      inset 0 1.5px 0 var(--glass-hilite),
+      inset 0 -1px 0 var(--glass-shade);
+  }
+  .ghost-btn:hover:not(:disabled){background:rgba(255,255,255,.17);border-color:var(--accent);}
+  .ghost-btn:disabled, .next-btn:disabled{opacity:0.3;cursor:default;}
+
+  /* Pantalla de bienvenida ("¿Qué es una falacia?") */
+  #welcomeOverlay .present-text{margin:0 0 14px;}
+  #welcomeOverlay .present-text:last-of-type{margin-bottom:0;}
+  .welcome-title{font-size:clamp(26px,4.5vw,42px);margin-bottom:18px;}
+  .welcome-actions{display:flex;justify-content:flex-end;margin-top:22px;}
+
+  @media (max-width:480px){
+    header.top{flex-direction:column;}
+    .top-controls{align-self:flex-start;}
+  }

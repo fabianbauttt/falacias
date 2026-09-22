@@ -1,0 +1,616 @@
+// Lógica funcional de Cazafalacias: construcción del catálogo, selector de
+// familias, pestañas, modo proyección, práctica y pantalla de bienvenida.
+//
+// Nota de refactorización (ver también data.js y index.html):
+// - Este archivo es un módulo ES (cargado con <script type="module">), así
+//   que ya tiene su propio ámbito de nivel superior: nada de lo declarado
+//   aquí llega a `window` aunque no esté envuelto en una función. La IIFE
+//   `(function(){ ... })();` del archivo original ya no es necesaria —de
+//   hecho, un `import` estático como el de abajo solo puede escribirse en
+//   el nivel superior del módulo, así que tenía que salir para poder
+//   importar— pero el comportamiento en tiempo de ejecución es el mismo.
+// - Todo `var` se reemplazó por `let` o `const` según si el valor se
+//   reasigna más adelante. Ningún valor, orden de ejecución ni condición
+//   cambió: es un cambio de sintaxis, no de lógica.
+// - Un <script type="module"> ya se comporta como si tuviera `defer`
+//   (se ejecuta después de parsear el DOM), así que ubicarlo al final del
+//   <body> es solo por claridad, no por necesidad.
+
+import { CATS, CAT_ORDER, FALLACIES, PRACTICE } from "./data.js";
+
+// La plataforma original que alojaba esta página no declaraba idioma en
+// <html>; aquí index.html ya trae lang="es" propio, pero se deja esta
+// línea tal cual estaba (no es más que una reafirmación redundante e
+// inofensiva) para no tocar nada de la lógica existente.
+document.documentElement.lang = "es";
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, function(c){
+    return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+  });
+}
+
+const byId = {};
+FALLACIES.forEach(function(f){ byId[f.id] = f; });
+
+function catSoftBg(catKey){ return "var(" + CATS[catKey].soft + ")"; }
+function catColor(catKey){ return "var(" + CATS[catKey].varName + ")"; }
+function lower1(s){ return s.charAt(0).toLowerCase() + s.slice(1); }
+
+// ---------- Catalog ----------
+const catalogRoot = document.getElementById("catalog-root");
+CAT_ORDER.forEach(function(catKey){
+  const cat = CATS[catKey];
+  const section = document.createElement("section");
+  section.className = "category";
+  section.dataset.cat = catKey;
+  // Oculta por defecto: el selector de familias decide cuál mostrar.
+  section.hidden = true;
+
+  const head = document.createElement("div");
+  head.className = "category-head";
+  const row = document.createElement("div");
+  row.className = "row";
+  const h2 = document.createElement("h2");
+  h2.textContent = cat.label;
+  const tag = document.createElement("span");
+  tag.className = "cat-tag";
+  tag.style.background = "var(" + cat.soft + ")";
+  tag.style.color = "var(" + cat.varName + ")";
+  tag.textContent = "FAMILIA " + (CAT_ORDER.indexOf(catKey) + 1) + "/4";
+  row.appendChild(h2);
+  row.appendChild(tag);
+  const desc = document.createElement("p");
+  desc.className = "cat-desc";
+  desc.textContent = cat.desc;
+  head.appendChild(row);
+  head.appendChild(desc);
+  section.appendChild(head);
+
+  const grid = document.createElement("div");
+  grid.className = "cards";
+
+  const items = FALLACIES.filter(function(f){ return f.cat === catKey; });
+  items.forEach(function(f){
+    const card = document.createElement("article");
+    card.className = "card";
+    card.style.setProperty("--cat-color", catColor(catKey));
+    card.style.setProperty("--cat-soft-color", catSoftBg(catKey));
+
+    const tabEl = document.createElement("span");
+    tabEl.className = "card-tab";
+    tabEl.textContent = "EXPEDIENTE " + (FALLACIES.indexOf(f)+1).toString().padStart(2,"0");
+    card.appendChild(tabEl);
+
+    const detailId = "detail-" + f.id;
+    const top = document.createElement("button");
+    top.type = "button";
+    top.className = "card-top";
+    top.setAttribute("aria-expanded", "false");
+    top.setAttribute("aria-controls", detailId);
+    // Un <button> solo admite contenido "de frase" (spans, texto): nada de
+    // <div>/<h3>/<p> dentro. El encabezado envuelve al botón en vez de
+    // vivir adentro, así se sigue pudiendo navegar por encabezados con
+    // lector de pantalla sin violar el modelo de contenido de <button>.
+    const textWrap = document.createElement("span");
+    textWrap.className = "card-top-text";
+    const titleSpan = document.createElement("span");
+    titleSpan.className = "card-top-title";
+    titleSpan.textContent = f.name;
+    const hookSpan = document.createElement("span");
+    hookSpan.className = "hook";
+    hookSpan.textContent = f.hook;
+    textWrap.appendChild(titleSpan);
+    textWrap.appendChild(hookSpan);
+    const icon = document.createElement("span");
+    icon.className = "expand-icon";
+    icon.textContent = "+";
+    icon.setAttribute("aria-hidden", "true");
+    top.appendChild(textWrap);
+    top.appendChild(icon);
+
+    const heading = document.createElement("h3");
+    heading.className = "card-top-heading";
+    heading.appendChild(top);
+    card.appendChild(heading);
+
+    const detail = document.createElement("div");
+    detail.className = "card-detail";
+    detail.id = detailId;
+    detail.innerHTML =
+      '<div class="label">DEFINICIÓN</div><div>' + escapeHtml(f.def) + '</div>' +
+      '<div class="label">POR QUÉ FALLA</div><div>' + escapeHtml(f.why) + '</div>' +
+      '<div class="label">EJEMPLO</div><div class="example-clip">“' + escapeHtml(f.example) + '”</div>';
+    card.appendChild(detail);
+
+    top.addEventListener("click", function(){
+      const open = top.getAttribute("aria-expanded") === "true";
+      top.setAttribute("aria-expanded", open ? "false" : "true");
+      card.classList.toggle("open", !open);
+    });
+
+    grid.appendChild(card);
+  });
+
+  section.appendChild(grid);
+  catalogRoot.appendChild(section);
+});
+
+// ---------- Selector de familias ----------
+const familySelectorRoot = document.getElementById("familySelectorRoot");
+const familyBackRow = document.getElementById("familyBackRow");
+const familyBackBtn = document.getElementById("familyBackBtn");
+const catalogSections = catalogRoot.querySelectorAll("section.category");
+let lastFamilyDoor = null;
+
+CAT_ORDER.forEach(function(catKey){
+  const cat = CATS[catKey];
+  const heading = document.createElement("h2");
+  heading.className = "family-card-heading";
+
+  const door = document.createElement("button");
+  door.type = "button";
+  door.className = "family-card";
+  door.dataset.cat = catKey;
+  door.style.setProperty("--cat-color", catColor(catKey));
+
+  const tag = document.createElement("span");
+  tag.className = "family-card-tag";
+  tag.textContent = "FAMILIA " + (CAT_ORDER.indexOf(catKey) + 1) + "/4";
+
+  const title = document.createElement("span");
+  title.className = "family-card-title";
+  title.textContent = cat.label;
+
+  const desc = document.createElement("span");
+  desc.className = "family-card-desc";
+  desc.textContent = cat.desc;
+
+  const n = FALLACIES.filter(function(f){ return f.cat === catKey; }).length;
+  const count = document.createElement("span");
+  count.className = "family-card-count";
+  count.textContent = n + (n === 1 ? " falacia →" : " falacias →");
+
+  door.appendChild(tag);
+  door.appendChild(title);
+  door.appendChild(desc);
+  door.appendChild(count);
+  heading.appendChild(door);
+  familySelectorRoot.appendChild(heading);
+
+  door.addEventListener("click", function(){ showFamily(catKey, door); });
+});
+
+function showFamily(catKey, triggerEl){
+  lastFamilyDoor = triggerEl || familySelectorRoot.querySelector('.family-card[data-cat="' + catKey + '"]');
+  familySelectorRoot.hidden = true;
+  familyBackRow.hidden = false;
+  Array.prototype.forEach.call(catalogSections, function(section){
+    section.hidden = section.dataset.cat !== catKey;
+  });
+  familyBackBtn.focus();
+}
+function showFamilySelector(){
+  familySelectorRoot.hidden = false;
+  familyBackRow.hidden = true;
+  Array.prototype.forEach.call(catalogSections, function(section){ section.hidden = true; });
+  if(lastFamilyDoor && typeof lastFamilyDoor.focus === "function"){ lastFamilyDoor.focus(); }
+}
+familyBackBtn.addEventListener("click", showFamilySelector);
+
+// ---------- Tabs ----------
+const tabCatalogo = document.getElementById("tab-catalogo");
+const tabPractica = document.getElementById("tab-practica");
+const viewCatalogo = document.getElementById("view-catalogo");
+const viewPractica = document.getElementById("view-practica");
+const tabButtons = [tabCatalogo, tabPractica];
+// Roving tabindex: solo la pestaña seleccionada es una parada de Tab: las
+// flechas mueven el foco entre pestañas sin añadir paradas extra al orden
+// normal de tabulación (patrón WAI-ARIA APG para "tabs").
+tabCatalogo.tabIndex = 0;
+tabPractica.tabIndex = -1;
+
+function selectTab(which, opts){
+  const moveFocus = opts && opts.moveFocus;
+  const catalogo = which === "catalogo";
+  tabCatalogo.setAttribute("aria-selected", catalogo ? "true" : "false");
+  tabPractica.setAttribute("aria-selected", catalogo ? "false" : "true");
+  tabCatalogo.tabIndex = catalogo ? 0 : -1;
+  tabPractica.tabIndex = catalogo ? -1 : 0;
+  viewCatalogo.classList.toggle("active", catalogo);
+  viewPractica.classList.toggle("active", !catalogo);
+  // Cada pestaña tiene su propio modo de proyección: al cambiar de pestaña
+  // se limpian los dos, para que el botón nunca quede diciendo "apagado"
+  // mientras algún efecto visual del otro modo sigue activo.
+  closePresent();
+  document.body.classList.remove("projection");
+  updateProjButton();
+  if(moveFocus){ (catalogo ? tabCatalogo : tabPractica).focus(); }
+}
+tabCatalogo.addEventListener("click", function(){ selectTab("catalogo"); });
+tabPractica.addEventListener("click", function(){ selectTab("practica"); });
+
+// Flechas ←/→ y Home/End dentro del tablist: mueven el foco y activan la
+// pestaña de una vez (activación automática, como espera quien usa teclado
+// o lector de pantalla en un patrón de "tabs" estándar).
+document.querySelector("nav.tabs").addEventListener("keydown", function(e){
+  const key = e.key;
+  if(key !== "ArrowLeft" && key !== "ArrowRight" && key !== "Home" && key !== "End") return;
+  const currentIndex = tabButtons.indexOf(document.activeElement);
+  if(currentIndex === -1) return;
+  e.preventDefault();
+  let nextIndex;
+  if(key === "Home"){ nextIndex = 0; }
+  else if(key === "End"){ nextIndex = tabButtons.length - 1; }
+  else {
+    const dir = key === "ArrowRight" ? 1 : -1;
+    nextIndex = (currentIndex + dir + tabButtons.length) % tabButtons.length;
+  }
+  const nextTab = tabButtons[nextIndex];
+  selectTab(nextTab === tabCatalogo ? "catalogo" : "practica", { moveFocus:true });
+});
+
+// ---------- Presentation overlay (Catálogo, one expediente at a time) ----------
+const presentOverlay = document.getElementById("presentOverlay");
+const presentBody = document.getElementById("presentBody");
+const presentProgress = document.getElementById("presentProgress");
+const presentPrev = document.getElementById("presentPrev");
+const presentNext = document.getElementById("presentNext");
+const presentClose = document.getElementById("presentClose");
+let presentIndex = 0;
+const wrapEl = document.querySelector(".wrap");
+let lastFocused = null;
+
+function renderPresent(){
+  const f = FALLACIES[presentIndex];
+  const cat = CATS[f.cat];
+  presentProgress.textContent = "Expediente " + (presentIndex+1) + " de " + FALLACIES.length + " · " + cat.label;
+  presentBody.innerHTML =
+    '<span class="present-tag" style="background:' + catSoftBg(f.cat) + ';color:' + catColor(f.cat) + '">' + f.cat.toUpperCase() + '</span>' +
+    '<h2 class="present-name">' + escapeHtml(f.name) + '</h2>' +
+    '<p class="present-hook">' + escapeHtml(f.hook) + '</p>' +
+    '<div class="present-label">DEFINICIÓN</div>' +
+    '<p class="present-text">' + escapeHtml(f.def) + '</p>' +
+    '<div class="present-label">POR QUÉ FALLA</div>' +
+    '<p class="present-text">' + escapeHtml(f.why) + '</p>' +
+    '<div class="present-label">EJEMPLO</div>' +
+    '<p class="present-example" style="background:' + catSoftBg(f.cat) + '">“' + escapeHtml(f.example) + '”</p>';
+  presentPrev.disabled = presentIndex === 0;
+  presentNext.disabled = presentIndex === FALLACIES.length - 1;
+}
+
+function openPresent(){
+  lastFocused = document.activeElement;
+  presentIndex = 0;
+  renderPresent();
+  presentOverlay.hidden = false;
+  if(wrapEl) wrapEl.inert = true;
+  presentClose.focus();
+  updateProjButton();
+}
+function closePresent(){
+  if(!presentOverlay.hidden){
+    presentOverlay.hidden = true;
+    if(wrapEl) wrapEl.inert = false;
+    if(lastFocused && typeof lastFocused.focus === "function"){ lastFocused.focus(); }
+    updateProjButton();
+  }
+}
+presentPrev.addEventListener("click", function(){
+  if(presentIndex > 0){ presentIndex--; renderPresent(); }
+});
+presentNext.addEventListener("click", function(){
+  if(presentIndex < FALLACIES.length - 1){ presentIndex++; renderPresent(); }
+});
+presentClose.addEventListener("click", closePresent);
+document.addEventListener("keydown", function(e){
+  if(presentOverlay.hidden) return;
+  if(e.key === "Escape") closePresent();
+  if(e.key === "ArrowRight" && !presentNext.disabled){ presentIndex++; renderPresent(); }
+  if(e.key === "ArrowLeft" && !presentPrev.disabled){ presentIndex--; renderPresent(); }
+});
+
+// ---------- Projection / presentation toggle button ----------
+const projBtn = document.getElementById("projBtn");
+function updateProjButton(){
+  const on = tabCatalogo.getAttribute("aria-selected") === "true"
+    ? !presentOverlay.hidden
+    : document.body.classList.contains("projection");
+  projBtn.setAttribute("aria-pressed", on ? "true" : "false");
+}
+projBtn.addEventListener("click", function(){
+  if(tabCatalogo.getAttribute("aria-selected") === "true"){
+    if(presentOverlay.hidden){ openPresent(); } else { closePresent(); }
+  } else {
+    document.body.classList.toggle("projection");
+    updateProjButton();
+  }
+});
+
+// ---------- Practice ----------
+let queue = [];
+let qIndex = 0;
+// "Gramática de la Cuantificación": dos contadores con roles distintos, no
+// una sola fracción de aciertos/errores.
+// - criticalAnalysisPoints solo suma (nunca se muestra como fracción ni
+//   resta por un error): cada caso resuelto correctamente —al primer
+//   intento o al segundo— aporta un punto de análisis crítico.
+// - totalAttempts es el "marcador de persistencia": cuenta cada clic sobre
+//   una opción a lo largo de TODA la sesión de práctica (se reinicia solo
+//   al recargar la página, nunca entre un caso y el siguiente), para
+//   enmarcar el esfuerzo —incluido el de equivocarse y volver a intentar—
+//   como algo que se acumula, no como una tasa de error.
+let criticalAnalysisPoints = 0;
+let totalAttempts = 0;
+// Sistema de dos intentos con andamiaje conceptual: currentAttempts cuenta
+// los clics fallidos del caso actual (se reinicia en cada pregunta nueva);
+// caseResolved es true solo cuando el caso queda cerrado de verdad —al
+// acertar, o al fallar por segunda vez— y es lo único que bloquea nuevos
+// clics y habilita "Siguiente caso".
+let currentAttempts = 0;
+let caseResolved = false;
+
+function shuffle(arr){
+  const a = arr.slice();
+  for(let i=a.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    const tmp=a[i]; a[i]=a[j]; a[j]=tmp;
+  }
+  return a;
+}
+
+function buildQueue(){
+  queue = shuffle(PRACTICE.map(function(_,i){return i;}));
+  qIndex = 0;
+}
+
+const progressLabel = document.getElementById("progressLabel");
+const scoreLabel = document.getElementById("scoreLabel");
+const attemptsLabel = document.getElementById("attemptsLabel");
+const statementText = document.getElementById("statementText");
+// tabindex="-1" inyectado en tiempo de ejecución: permite enfocar el
+// enunciado por script (para que el lector de pantalla lo anuncie al
+// avanzar de caso) sin añadirlo como parada nueva al orden normal de Tab.
+statementText.tabIndex = -1;
+const optionsRoot = document.getElementById("optionsRoot");
+const feedbackBox = document.getElementById("feedbackBox");
+const feedbackVerdict = document.getElementById("feedbackVerdict");
+const feedbackBody = document.getElementById("feedbackBody");
+const nextBtn = document.getElementById("nextBtn");
+
+function pickOptions(correctFallacy){
+  const pool = FALLACIES.filter(function(f){ return f.id !== correctFallacy.id; });
+  const sameCat = pool.filter(function(f){ return f.cat === correctFallacy.cat; });
+  const otherCat = pool.filter(function(f){ return f.cat !== correctFallacy.cat; });
+  const chosenSameCat = shuffle(sameCat).slice(0,1);
+  const restPool = otherCat.concat(sameCat.filter(function(f){ return chosenSameCat.indexOf(f) === -1; }));
+  const chosenRest = shuffle(restPool).slice(0,2);
+  return shuffle([correctFallacy].concat(chosenSameCat, chosenRest));
+}
+
+function renderQuestion(moveFocusToFirstOption){
+  // Si el foco está en "Siguiente caso" (o en cualquier opción de la
+  // pregunta anterior) y lo deshabilitamos como parte de este refresco,
+  // el navegador lo manda a <body> y quien navega con teclado pierde su
+  // posición. Lo movemos nosotros mismos a un lugar sensato ANTES de
+  // deshabilitar nada.
+  const focusWasInPractice = document.activeElement &&
+    (document.activeElement === nextBtn || optionsRoot.contains(document.activeElement));
+
+  if(qIndex >= queue.length){ buildQueue(); }
+  const practiceIdx = queue[qIndex];
+  const entry = PRACTICE[practiceIdx];
+  const correctId = entry[0];
+  const text = entry[1];
+  const correctFallacy = byId[correctId];
+
+  statementText.textContent = text;
+  progressLabel.textContent = "Caso " + (qIndex+1) + " de " + PRACTICE.length;
+
+  const options = pickOptions(correctFallacy);
+  const letters = ["A","B","C","D"];
+
+  optionsRoot.innerHTML = "";
+  options.forEach(function(opt, i){
+    const btn = document.createElement("button");
+    btn.className = "opt-btn";
+    btn.type = "button";
+    btn.dataset.fid = opt.id;
+    const letter = document.createElement("span");
+    letter.className = "opt-letter";
+    letter.textContent = letters[i];
+    const label = document.createElement("span");
+    label.textContent = opt.name;
+    btn.appendChild(letter);
+    btn.appendChild(label);
+    btn.addEventListener("click", function(){ handleAnswer(opt, correctFallacy, btn); });
+    optionsRoot.appendChild(btn);
+  });
+
+  feedbackBox.classList.remove("show","good","bad","hint");
+  // El contenedor aria-live ya no se oculta con display:none (ver
+  // .feedback en styles.css), así que sigue presente en el árbol de
+  // accesibilidad entre un caso y otro. Si no vaciamos su texto aquí,
+  // alguien navegando con lector de pantalla en modo de exploración
+  // podría toparse con la retroalimentación del caso ANTERIOR todavía
+  // "leíble" aunque esté oculta visualmente.
+  feedbackVerdict.textContent = "";
+  feedbackBody.innerHTML = "";
+  nextBtn.disabled = true;
+  caseResolved = false;
+  currentAttempts = 0;
+
+  // Antes el foco pasaba a la primera opción de respuesta al avanzar de
+  // caso: un lector de pantalla saltaba directo a las alternativas y
+  // nunca llegaba a anunciar el enunciado nuevo. Ahora aterriza en el
+  // propio enunciado (statementText, con tabindex="-1" asignado arriba),
+  // así se lee el caso nuevo antes de que la persona llegue a las opciones.
+  if(moveFocusToFirstOption && focusWasInPractice){
+    statementText.focus();
+  }
+}
+
+// Anuncia una pista de andamiaje tras un primer intento fallido: nombra la
+// falacia elegida (incorrecta) y recuerda su definición, sin revelar la
+// respuesta correcta. El caso queda abierto para un segundo intento.
+function showHint(chosen){
+  feedbackBox.classList.remove("good","bad");
+  feedbackBox.classList.add("show","hint");
+  feedbackVerdict.textContent = "No es " + chosen.name + ".";
+  feedbackBody.innerHTML =
+    "<p>Recuerda que <strong>" + escapeHtml(chosen.name) + "</strong> ocurre cuando " + escapeHtml(lower1(chosen.def)) + " Vuelve a leer el enunciado e intenta de nuevo.</p>";
+  scrollIntoViewPolite(feedbackBox);
+}
+
+// Cierra el caso de forma definitiva: al acertar (en el primer o segundo
+// intento) o al fallar por segunda vez. Deshabilita todas las opciones,
+// revela cuál era la correcta y habilita "Siguiente caso". Reutiliza
+// exactamente la lógica de revelación que ya existía cuando el sistema
+// era de un solo intento.
+function closeCase(chosen, correctFallacy, isCorrect){
+  caseResolved = true;
+  // Puntos de Análisis Crítico: solo suman, nunca se expresan como
+  // fracción de intentos fallidos — un acierto al segundo intento vale lo
+  // mismo que uno al primero, porque lo que se está reconociendo es haber
+  // resuelto el caso, no la ausencia de error en el camino.
+  if(isCorrect){ criticalAnalysisPoints++; }
+  scoreLabel.textContent = "Puntos de Análisis Crítico: " + criticalAnalysisPoints;
+
+  Array.prototype.forEach.call(optionsRoot.children, function(b){
+    b.disabled = true;
+    if(b.dataset.fid === correctFallacy.id){ b.classList.add("correct"); }
+  });
+
+  feedbackBox.classList.remove("hint");
+  feedbackBox.classList.add("show", isCorrect ? "good" : "bad");
+
+  if(isCorrect){
+    feedbackVerdict.textContent = "¡Exacto! Es " + correctFallacy.name + ".";
+    feedbackBody.innerHTML = "<p>" + escapeHtml(correctFallacy.why) + "</p>";
+  } else {
+    feedbackVerdict.textContent = "No — es " + correctFallacy.name + ", no " + chosen.name + ".";
+    feedbackBody.innerHTML =
+      "<p><strong>" + escapeHtml(chosen.name) + "</strong> es cuando " + escapeHtml(lower1(chosen.def)) + " No es lo que pasa en este caso.</p>" +
+      "<p><strong>" + escapeHtml(correctFallacy.name) + "</strong> sí aplica: " + escapeHtml(lower1(correctFallacy.why)) + "</p>";
+  }
+
+  nextBtn.disabled = false;
+  // El botón que se acaba de responder queda deshabilitado; quien navega
+  // con teclado necesita que el foco aterrice en algún lugar visible en
+  // vez de perderse. "Siguiente caso" es la acción que sigue de todas
+  // formas, así que lo enfocamos nosotros.
+  nextBtn.focus();
+  scrollIntoViewPolite(nextBtn);
+}
+
+// En pantallas bajas, la retroalimentación (sobre todo cuando trae dos
+// párrafos) puede empujar el elemento objetivo fuera de la vista. Lo
+// traemos a la vista sin saltos bruscos para quien no pidió menos
+// movimiento. Compartida entre la pista de andamiaje (apunta a
+// feedbackBox) y el cierre del caso (apunta a nextBtn).
+function scrollIntoViewPolite(el){
+  const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  requestAnimationFrame(function(){
+    el.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "nearest" });
+  });
+}
+
+function handleAnswer(chosen, correctFallacy, btn){
+  if(caseResolved || btn.disabled) return;
+  currentAttempts++;
+  // Marcador de Persistencia: suma en CADA clic válido, sea o no acertado,
+  // y nunca se reinicia entre casos (solo currentAttempts se reinicia por
+  // pregunta). Enmarca el esfuerzo invertido en la sesión completa como
+  // algo que se acumula de forma positiva, no como una tasa de error.
+  totalAttempts++;
+  attemptsLabel.textContent = "Persistencia: " + totalAttempts + (totalAttempts === 1 ? " intento" : " intentos");
+  const isCorrect = chosen.id === correctFallacy.id;
+
+  if(isCorrect){
+    closeCase(chosen, correctFallacy, true);
+    return;
+  }
+
+  // Incorrecto: se marca SOLO el botón elegido, sin tocar los demás ni
+  // revelar la respuesta correcta todavía.
+  btn.classList.add("wrong");
+  btn.disabled = true;
+
+  if(currentAttempts < 2){
+    // Primer intento fallido: pista de andamiaje, el caso sigue abierto.
+    showHint(chosen);
+    // El botón recién marcado queda deshabilitado; sin intervención el
+    // navegador manda el foco a <body> (el mismo problema ya resuelto
+    // antes en este archivo para otros casos de deshabilitar el control
+    // enfocado). Lo llevamos nosotros a la siguiente opción disponible
+    // para que el segundo intento quede a un solo paso.
+    const nextOption = Array.prototype.find.call(optionsRoot.children, function(b){ return !b.disabled; });
+    if(nextOption) nextOption.focus();
+  } else {
+    // Segundo intento fallido: se cierra el caso sin acierto.
+    closeCase(chosen, correctFallacy, false);
+  }
+}
+
+nextBtn.addEventListener("click", function(){
+  qIndex++;
+  renderQuestion(true);
+});
+
+buildQueue();
+renderQuestion();
+updateProjButton();
+
+// ---------- Pantalla de bienvenida ("¿Qué es una falacia?") ----------
+const welcomeOverlay = document.getElementById("welcomeOverlay");
+const welcomeClose = document.getElementById("welcomeClose");
+const welcomeStart = document.getElementById("welcomeStart");
+const aboutBtn = document.getElementById("aboutBtn");
+let welcomeLastFocused = null;
+
+function openWelcome(){
+  welcomeLastFocused = document.activeElement;
+  // Evita dos overlays de pantalla completa abiertos a la vez.
+  closePresent();
+  document.body.classList.remove("projection");
+  welcomeOverlay.hidden = false;
+  if(wrapEl) wrapEl.inert = true;
+  welcomeClose.focus();
+}
+function closeWelcome(){
+  if(!welcomeOverlay.hidden){
+    welcomeOverlay.hidden = true;
+    if(wrapEl) wrapEl.inert = false;
+    // En la primera visita, la bienvenida se abre sola apenas carga la
+    // página: en ese momento nadie ha enfocado nada todavía, así que
+    // welcomeLastFocused es <body> (que técnicamente tiene .focus(), pero
+    // enfocarlo no lleva a ningún lado útil). En ese caso, y en cualquier
+    // otro sin un foco previo real, caemos en el botón "¿Qué es una
+    // falacia?" como ancla conocida.
+    if(welcomeLastFocused && welcomeLastFocused !== document.body && typeof welcomeLastFocused.focus === "function"){
+      welcomeLastFocused.focus();
+    } else {
+      aboutBtn.focus();
+    }
+  }
+}
+welcomeClose.addEventListener("click", closeWelcome);
+welcomeStart.addEventListener("click", closeWelcome);
+aboutBtn.addEventListener("click", openWelcome);
+document.addEventListener("keydown", function(e){
+  if(welcomeOverlay.hidden) return;
+  if(e.key === "Escape") closeWelcome();
+});
+
+// Se abre sola la primera vez que alguien visita la página en este
+// navegador (una conveniencia liviana por dispositivo, vía localStorage;
+// nunca se comparte entre personas ni se sincroniza). Si el
+// almacenamiento no está disponible (modo privado, política del
+// navegador), simplemente no se abre sola — el botón "¿Qué es una
+// falacia?" del encabezado siempre queda disponible para abrirla.
+try {
+  if(!window.localStorage.getItem("cazafalacias-welcome-seen")){
+    openWelcome();
+    window.localStorage.setItem("cazafalacias-welcome-seen", "1");
+  }
+} catch(e) { /* almacenamiento no disponible: sin auto-apertura */ }
