@@ -104,7 +104,7 @@ CAT_ORDER.forEach(function(catKey){
   tag.className = "cat-tag";
   tag.style.background = "var(" + cat.soft + ")";
   tag.style.color = "var(" + cat.varName + ")";
-  tag.textContent = "FAMILIA " + (CAT_ORDER.indexOf(catKey) + 1) + "/4";
+  tag.textContent = "MODUS OPERANDI " + (CAT_ORDER.indexOf(catKey) + 1) + "/4";
   row.appendChild(headingIcon);
   row.appendChild(h2);
   row.appendChild(tag);
@@ -221,7 +221,7 @@ CAT_ORDER.forEach(function(catKey){
   head.className = "family-card-head";
   const tag = document.createElement("span");
   tag.className = "family-card-tag";
-  tag.textContent = "FAMILIA " + (CAT_ORDER.indexOf(catKey) + 1) + "/4";
+  tag.textContent = "MODUS OPERANDI " + (CAT_ORDER.indexOf(catKey) + 1) + "/4";
   const icon = catIconEl(catKey, "family-icon");
   head.appendChild(tag);
   head.appendChild(icon);

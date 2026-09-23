@@ -264,7 +264,8 @@
   .category-head .row{
     display:flex;
     align-items:center;
-    gap:10px;
+    flex-wrap:wrap;
+    gap:6px 10px;
   }
   .category-icon{width:24px;height:24px;}
   .category-head h2{
