@@ -37,6 +37,14 @@ function catSoftBg(catKey){ return "var(" + CATS[catKey].soft + ")"; }
 function catColor(catKey){ return "var(" + CATS[catKey].varName + ")"; }
 function lower1(s){ return s.charAt(0).toLowerCase() + s.slice(1); }
 
+// Se pone en true recién al final de este archivo, cuando toda la
+// infraestructura de la inducción progresiva (Fase 1 y Fase 2, más abajo)
+// ya quedó definida. renderQuestion() se llama una vez de entrada, en
+// caliente, antes de llegar a esa parte del archivo — sin esta bandera,
+// esa primera llamada intentaría usar PRACTICE_TIPS/coachOverlay antes de
+// que existan y rompería la carga de toda la página.
+let onboardingReady = false;
+
 // ---------- Íconos de familia ----------
 // Un trazo simple (stroke=currentColor) por familia, deliberadamente
 // distinto del ícono de marca (la lupa del encabezado) para que cada
@@ -294,6 +302,11 @@ function selectTab(which, opts){
   document.body.classList.remove("projection");
   updateProjButton();
   if(moveFocus){ (catalogo ? tabCatalogo : tabPractica).focus(); }
+  // El primer caso (qIndex 0) ya está renderizado en el HTML desde antes de
+  // que onboardingReady exista, así que renderQuestion() nunca llegó a
+  // avisarle a la Fase 2 sobre él. Se lo avisamos acá, la primera vez que
+  // la persona entra a Práctica.
+  if(!catalogo && onboardingReady){ maybeShowTip("render", qIndex); }
 }
 tabCatalogo.addEventListener("click", function(){ selectTab("catalogo"); });
 tabPractica.addEventListener("click", function(){ selectTab("practica"); });
@@ -384,10 +397,17 @@ document.addEventListener("keydown", function(e){
 // ---------- Projection / presentation toggle button ----------
 const projBtn = document.getElementById("projBtn");
 function updateProjButton(){
-  const on = tabCatalogo.getAttribute("aria-selected") === "true"
-    ? !presentOverlay.hidden
-    : document.body.classList.contains("projection");
+  const catalogoActive = tabCatalogo.getAttribute("aria-selected") === "true";
+  const on = catalogoActive ? !presentOverlay.hidden : document.body.classList.contains("projection");
   projBtn.setAttribute("aria-pressed", on ? "true" : "false");
+  // Mismo botón, dos trabajos distintos según la pestaña activa: en el
+  // Catálogo abre el carrusel de expedientes a pantalla completa; en
+  // Práctica solo agranda el texto. Antes decía "Modo proyección" en los
+  // dos casos, así que quien lo aprendía en un lado esperaba lo mismo del
+  // otro. La etiqueta ahora cambia con la pestaña para que cada
+  // comportamiento se entienda por separado (ver Auditoría de
+  // Cazafalacias, hallazgo de UX).
+  projBtn.textContent = catalogoActive ? "Modo proyección" : "Texto grande";
 }
 projBtn.addEventListener("click", function(){
   if(tabCatalogo.getAttribute("aria-selected") === "true"){
@@ -453,8 +473,24 @@ const progressLabel = document.getElementById("progressLabel");
 // scoreLabel/attemptsLabel ahora envuelven un ícono decorativo además del
 // texto (ver index.html): el texto que cambia con cada respuesta vive en
 // estos spans internos, para no borrar el ícono cada vez que se actualiza.
+// Los contenedores en sí (no solo el texto) llevan aria-live="polite" en el
+// HTML — se guardan también aquí porque bumpPill() (más abajo) anima el
+// contenedor completo, no el texto suelto.
+const scoreLabel = document.getElementById("scoreLabel");
 const scoreLabelText = document.getElementById("scoreLabelText");
+const attemptsLabel = document.getElementById("attemptsLabel");
 const attemptsLabelText = document.getElementById("attemptsLabelText");
+// Pequeño refuerzo visual (además del auditivo y del aria-live) cada vez
+// que un contador cambia: un "bump" de escala breve. classList.remove +
+// reflow forzado (offsetWidth) + classList.add es el truco estándar para
+// poder volver a disparar la MISMA animación CSS en el mismo elemento en
+// clics consecutivos — sin el reflow de por medio, el navegador ve la
+// clase "ya puesta" y no vuelve a animar.
+function bumpPill(el){
+  el.classList.remove("pill-bump");
+  void el.offsetWidth;
+  el.classList.add("pill-bump");
+}
 const statementText = document.getElementById("statementText");
 // tabindex="-1" inyectado en tiempo de ejecución: permite enfocar el
 // enunciado por script (para que el lector de pantalla lo anuncie al
@@ -476,6 +512,93 @@ const journalTitle = document.getElementById("journalTitle");
 const journalSkills = document.getElementById("journalSkills");
 const journalTime = document.getElementById("journalTime");
 const journalRestartBtn = document.getElementById("journalRestartBtn");
+
+// ---------- Sonido de retroalimentación ----------
+// Tonos sintetizados en el momento con la Web Audio API (osciladores
+// simples): nada de archivos de audio que descargar, alojar o versionar —
+// el sitio sigue siendo exactamente estos 4 archivos estáticos. Los tres
+// eventos de validación de un caso (pista tras un primer intento fallido,
+// cierre sin acierto, acierto) usan tonos breves y distintos entre sí, para
+// que se reconozcan de oído sin depender de mirar la pantalla: un refuerzo
+// EN PARALELO al texto y a las animaciones, nunca su reemplazo.
+//
+// Calibración emocional a propósito: el sonido de un intento fallido NUNCA
+// es un timbre de alarma ni un "buzz" áspero. La pista (primer fallo) es
+// una sola nota breve y suave — "todavía no", el caso sigue abierto para un
+// segundo intento. El cierre sin acierto (segundo fallo) es apenas un poco
+// más definido pero sigue siendo dos notas suaves y descendentes, sin
+// disonancia: informa que el caso se cerró, no castiga por haberlo fallado.
+// El acierto, en cambio, usa una onda triangular más luminosa y dos notas
+// ascendentes — la única señal que se permite sonar francamente positiva.
+const SOUND_KEY = "cazafalacias-sound";
+let soundsEnabled = true;
+try {
+  const storedSound = window.localStorage.getItem(SOUND_KEY);
+  if(storedSound !== null) soundsEnabled = storedSound === "1";
+} catch(e) { /* sin localStorage: sonido activado por defecto, sin romper nada */ }
+
+let audioCtx = null;
+function getAudioCtx(){
+  const Ctor = window.AudioContext || window.webkitAudioContext;
+  if(!Ctor) return null;
+  if(!audioCtx){ audioCtx = new Ctor(); }
+  // Los navegadores arrancan el contexto "suspended" hasta el primer gesto
+  // del usuario. Cada clic sobre una opción de respuesta YA es ese gesto,
+  // así que basta con reanudarlo aquí — no hace falta un paso previo solo
+  // para "desbloquear" el audio.
+  if(audioCtx.state === "suspended"){ audioCtx.resume(); }
+  return audioCtx;
+}
+
+// Un tono con envolvente de ataque/caída corta (evita el "clic" de
+// prender/apagar una onda de golpe), reutilizado por las tres señales.
+function playTone(ctx, freq, startOffset, duration, peakGain, wave){
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = wave;
+  osc.frequency.value = freq;
+  const t0 = ctx.currentTime + startOffset;
+  const t1 = t0 + duration;
+  gain.gain.setValueAtTime(0, t0);
+  gain.gain.linearRampToValueAtTime(peakGain, t0 + Math.min(0.015, duration / 3));
+  gain.gain.linearRampToValueAtTime(0, t1);
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(t0);
+  osc.stop(t1 + 0.02);
+}
+
+// kind: "hint" (primer intento fallido, el caso sigue abierto), "final"
+// (segundo intento fallido, caso cerrado sin acierto) o "correct".
+function playSfx(kind){
+  if(!soundsEnabled) return;
+  try {
+    const ctx = getAudioCtx();
+    if(!ctx) return;
+    if(kind === "correct"){
+      playTone(ctx, 523.25, 0,    0.11, 0.05,  "triangle"); // Do5
+      playTone(ctx, 659.25, 0.09, 0.16, 0.055, "triangle"); // Mi5
+    } else if(kind === "hint"){
+      playTone(ctx, 349.23, 0, 0.10, 0.035, "sine"); // Fa4, único y breve
+    } else {
+      playTone(ctx, 392.00, 0,    0.14, 0.045, "sine"); // Sol4
+      playTone(ctx, 329.63, 0.11, 0.18, 0.045, "sine"); // Mi4
+    }
+  } catch(e) { /* Web Audio no disponible o bloqueada: sin sonido, sin romper nada */ }
+}
+
+const soundBtn = document.getElementById("soundBtn");
+const soundIcon = document.getElementById("soundIcon");
+function updateSoundButton(){
+  soundBtn.setAttribute("aria-pressed", soundsEnabled ? "true" : "false");
+  soundIcon.textContent = soundsEnabled ? "🔊" : "🔇";
+}
+updateSoundButton();
+soundBtn.addEventListener("click", function(){
+  soundsEnabled = !soundsEnabled;
+  updateSoundButton();
+  try { window.localStorage.setItem(SOUND_KEY, soundsEnabled ? "1" : "0"); } catch(e) { /* no persiste, pero no rompe nada */ }
+});
 
 function pickOptions(correctFallacy){
   const pool = FALLACIES.filter(function(f){ return f.id !== correctFallacy.id; });
@@ -549,6 +672,8 @@ function renderQuestion(moveFocusToFirstOption){
   if(moveFocusToFirstOption && focusWasInPractice){
     statementText.focus();
   }
+
+  if(onboardingReady) maybeShowTip("render", qIndex);
 }
 
 // Anuncia una pista de andamiaje tras un primer intento fallido: nombra la
@@ -561,6 +686,8 @@ function showHint(chosen){
   feedbackBody.innerHTML =
     "<p>Recuerda que <strong>" + escapeHtml(chosen.name) + "</strong> ocurre cuando " + escapeHtml(lower1(chosen.def)) + " Vuelve a leer el enunciado e intenta de nuevo.</p>";
   scrollIntoViewPolite(feedbackBox);
+
+  if(onboardingReady) maybeShowTip("feedback", qIndex);
 }
 
 // Cierra el caso de forma definitiva: al acertar (en el primer o segundo
@@ -582,6 +709,7 @@ function closeCase(chosen, correctFallacy, isCorrect){
   // resuelto el caso, no la ausencia de error en el camino.
   if(isCorrect){ criticalAnalysisPoints++; }
   scoreLabelText.textContent = "Puntos de Análisis Crítico: " + criticalAnalysisPoints;
+  if(isCorrect){ bumpPill(scoreLabel); }
 
   Array.prototype.forEach.call(optionsRoot.children, function(b){
     b.disabled = true;
@@ -613,6 +741,8 @@ function closeCase(chosen, correctFallacy, isCorrect){
   // formas, así que lo enfocamos nosotros.
   nextBtn.focus();
   scrollIntoViewPolite(nextBtn);
+
+  if(onboardingReady) maybeShowTip("feedback", qIndex);
 }
 
 // En pantallas bajas, la retroalimentación (sobre todo cuando trae dos
@@ -636,20 +766,26 @@ function handleAnswer(chosen, correctFallacy, btn){
   // algo que se acumula de forma positiva, no como una tasa de error.
   totalAttempts++;
   attemptsLabelText.textContent = "Persistencia: " + totalAttempts + (totalAttempts === 1 ? " intento" : " intentos");
+  bumpPill(attemptsLabel);
   const isCorrect = chosen.id === correctFallacy.id;
 
   if(isCorrect){
+    playSfx("correct");
     closeCase(chosen, correctFallacy, true);
     return;
   }
 
   // Incorrecto: se marca SOLO el botón elegido, sin tocar los demás ni
-  // revelar la respuesta correcta todavía.
+  // revelar la respuesta correcta todavía. El propio CSS de .opt-btn.wrong
+  // ya trae su sacudida breve (optWrongShake) y .opt-btn.correct su pulso
+  // (optCorrectPulse, ver closeCase) — el sonido de abajo es su contraparte
+  // auditiva, no un reemplazo.
   btn.classList.add("wrong");
   btn.disabled = true;
 
   if(currentAttempts < 2){
     // Primer intento fallido: pista de andamiaje, el caso sigue abierto.
+    playSfx("hint");
     showHint(chosen);
     // El botón recién marcado queda deshabilitado; sin intervención el
     // navegador manda el foco a <body> (el mismo problema ya resuelto
@@ -660,9 +796,25 @@ function handleAnswer(chosen, correctFallacy, btn){
     if(nextOption) nextOption.focus();
   } else {
     // Segundo intento fallido: se cierra el caso sin acierto.
+    playSfx("final");
     closeCase(chosen, correctFallacy, false);
   }
 }
+
+// Aviso antes de perder el progreso de la sesión: recargar o cerrar la
+// pestaña no guarda nada (es intencional, ver footer y comentarios de
+// criticalAnalysisPoints/totalAttempts más arriba), pero hacerlo SIN darse
+// cuenta a mitad de una ronda es una frustración evitable. totalAttempts
+// nunca se reinicia solo (solo al recargar), así que ">0" es una señal
+// simple y confiable de "hay algo que se perdería". El texto del diálogo
+// lo pone el navegador — los navegadores actuales ignoran el mensaje
+// personalizado por seguridad — así que basta con dispararlo.
+window.addEventListener("beforeunload", function(e){
+  if(totalAttempts > 0){
+    e.preventDefault();
+    e.returnValue = "";
+  }
+});
 
 // Formatea milisegundos como "Ns" o "M min Ns" para el Diario de Caza. Solo
 // se usa una vez por ronda (al mostrar el panel final), así que no necesita
@@ -811,10 +963,15 @@ buildQueue();
 renderQuestion();
 updateProjButton();
 
-// ---------- Pantalla de bienvenida ("¿Qué es una falacia?") ----------
+// ---------- Referencia rápida ("¿Qué es una falacia?") ----------
+// Ya no se abre sola: la inducción progresiva de abajo reemplaza ese rol.
+// Esto queda como una tarjeta corta y opcional (2 definiciones, no 4
+// párrafos) disponible en cualquier momento, más un atajo para volver a
+// ver el recorrido guiado.
 const welcomeOverlay = document.getElementById("welcomeOverlay");
 const welcomeClose = document.getElementById("welcomeClose");
 const welcomeStart = document.getElementById("welcomeStart");
+const welcomeReplayTour = document.getElementById("welcomeReplayTour");
 const aboutBtn = document.getElementById("aboutBtn");
 let welcomeLastFocused = null;
 
@@ -831,12 +988,6 @@ function closeWelcome(){
   if(!welcomeOverlay.hidden){
     welcomeOverlay.hidden = true;
     if(wrapEl) wrapEl.inert = false;
-    // En la primera visita, la bienvenida se abre sola apenas carga la
-    // página: en ese momento nadie ha enfocado nada todavía, así que
-    // welcomeLastFocused es <body> (que técnicamente tiene .focus(), pero
-    // enfocarlo no lleva a ningún lado útil). En ese caso, y en cualquier
-    // otro sin un foco previo real, caemos en el botón "¿Qué es una
-    // falacia?" como ancla conocida.
     if(welcomeLastFocused && welcomeLastFocused !== document.body && typeof welcomeLastFocused.focus === "function"){
       welcomeLastFocused.focus();
     } else {
@@ -846,21 +997,276 @@ function closeWelcome(){
 }
 welcomeClose.addEventListener("click", closeWelcome);
 welcomeStart.addEventListener("click", closeWelcome);
+welcomeReplayTour.addEventListener("click", function(){
+  closeWelcome();
+  openCoach();
+});
 aboutBtn.addEventListener("click", openWelcome);
 document.addEventListener("keydown", function(e){
   if(welcomeOverlay.hidden) return;
   if(e.key === "Escape") closeWelcome();
 });
 
-// Se abre sola la primera vez que alguien visita la página en este
-// navegador (una conveniencia liviana por dispositivo, vía localStorage;
-// nunca se comparte entre personas ni se sincroniza). Si el
-// almacenamiento no está disponible (modo privado, política del
-// navegador), simplemente no se abre sola — el botón "¿Qué es una
-// falacia?" del encabezado siempre queda disponible para abrirla.
+// ---------- Inducción progresiva ----------
+// Reemplaza el modal único de "Antes de empezar": en vez de soltar toda la
+// teoría de una vez antes de que la persona haya tocado nada, la carga se
+// reparte en dos fases que aparecen en momentos distintos:
+// - Fase 1 (recorrido guiado, abajo): solo mecánica de la interfaz —dónde
+//   están los expedientes, qué hace cada botón—, la única carga que hace
+//   falta para poder empezar a moverse por el sitio ("carga extrínseca").
+// - Fase 2 (pistas contextuales, más abajo en Práctica): las definiciones
+//   conceptuales (qué es un argumento, qué es una falacia, que esto no
+//   califica) aparecen una por una, ancladas al elemento real de la
+//   interfaz, justo cuando el primer caso las hace relevantes — no antes
+//   ("carga intrínseca" dosificada en vez de un bloque de texto).
+// Todo el estado de qué ya se mostró vive en localStorage bajo una sola
+// clave, para que nada se repita al recargar. Si el almacenamiento no está
+// disponible (modo privado, política del navegador), onboardState queda en
+// null: ni el recorrido ni las pistas se abren solos, pero el botón
+// "¿Qué es una falacia?" y "Ver el recorrido guiado" los siguen ofreciendo
+// a mano, y esa apertura manual simplemente no se recuerda entre recargas.
+const ONBOARD_KEY = "cazafalacias-onboarding-v2";
+let onboardState;
 try {
-  if(!window.localStorage.getItem("cazafalacias-welcome-seen")){
-    openWelcome();
-    window.localStorage.setItem("cazafalacias-welcome-seen", "1");
+  onboardState = JSON.parse(window.localStorage.getItem(ONBOARD_KEY)) || {};
+} catch(e) {
+  onboardState = null;
+}
+function onboardDone(key){ return !!(onboardState && onboardState[key]); }
+function markOnboard(key){
+  if(!onboardState) return;
+  onboardState[key] = true;
+  try { window.localStorage.setItem(ONBOARD_KEY, JSON.stringify(onboardState)); } catch(e) { /* no persiste, pero no rompe nada */ }
+}
+
+// Coloca una caja flotante (la burbuja del recorrido o una pista de
+// Práctica) cerca de un elemento objetivo, sin salirse de la pantalla.
+// Compartida entre las dos fases porque el problema geométrico es el
+// mismo: solo cambia qué contiene la caja.
+function positionFloatingBox(boxEl, targetEl, preferredSide){
+  const r = targetEl.getBoundingClientRect();
+  const margin = 12;
+  const maxWidth = Math.min(320, window.innerWidth - margin*2);
+  boxEl.style.width = maxWidth + "px";
+  const boxHeight = boxEl.getBoundingClientRect().height;
+  let top;
+  if(preferredSide === "top" && r.top - boxHeight - margin > 0){
+    top = r.top - boxHeight - margin;
+  } else if(r.bottom + boxHeight + margin < window.innerHeight){
+    top = r.bottom + margin;
+  } else {
+    top = Math.max(margin, window.innerHeight - boxHeight - margin);
   }
-} catch(e) { /* almacenamiento no disponible: sin auto-apertura */ }
+  let left = r.left;
+  left = Math.min(left, window.innerWidth - maxWidth - margin);
+  left = Math.max(margin, left);
+  boxEl.style.top = top + "px";
+  boxEl.style.left = left + "px";
+}
+function reducedMotion(){
+  return window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+// ---- Fase 1: recorrido guiado de la interfaz ----
+const coachOverlay = document.getElementById("coachOverlay");
+const coachHighlight = document.getElementById("coachHighlight");
+const coachBubble = document.getElementById("coachBubble");
+const coachStepLabel = document.getElementById("coachStep");
+const coachTitleEl = document.getElementById("coachTitle");
+const coachTextEl = document.getElementById("coachText");
+const coachPrev = document.getElementById("coachPrev");
+const coachNext = document.getElementById("coachNext");
+const coachSkip = document.getElementById("coachSkip");
+
+const COACH_STEPS = [
+  {
+    selector: "nav.tabs",
+    title: "Dos maneras de usar Cazafalacias",
+    text: "Catálogo: expedientes para estudiar cada falacia con calma. Práctica: 36 casos para poner a prueba lo que sabes."
+  },
+  {
+    selector: ".family-card",
+    title: "Los expedientes viven aquí",
+    text: "Cada tarjeta agrupa 3 falacias que engañan de forma parecida. Haz clic en una para abrirla y leer las fichas completas."
+  },
+  {
+    selector: "#projBtn",
+    title: "Un botón, dos trabajos",
+    text: "Aquí, en el Catálogo, abre un carrusel a pantalla completa para proyectar en clase. Dentro de Práctica cambia de nombre a \"Texto grande\": ahí solo agranda la letra."
+  }
+];
+let coachIndex = 0;
+let coachLastFocused = null;
+
+function positionCoachHighlight(target){
+  const r = target.getBoundingClientRect();
+  const pad = 8;
+  coachHighlight.style.top = (r.top - pad) + "px";
+  coachHighlight.style.left = (r.left - pad) + "px";
+  coachHighlight.style.width = (r.width + pad*2) + "px";
+  coachHighlight.style.height = (r.height + pad*2) + "px";
+}
+function positionCoachStep(){
+  const step = COACH_STEPS[coachIndex];
+  const target = document.querySelector(step.selector);
+  if(!target){
+    // Defensivo: si el elemento no está (p. ej. una versión futura cambia
+    // de estructura), no se deja a nadie mirando un recorrido roto.
+    closeCoach(true);
+    return;
+  }
+  positionCoachHighlight(target);
+  positionFloatingBox(coachBubble, target, "bottom");
+  target.scrollIntoView({ block: "center", behavior: reducedMotion() ? "auto" : "smooth" });
+}
+function renderCoachStep(){
+  const step = COACH_STEPS[coachIndex];
+  coachStepLabel.textContent = "Paso " + (coachIndex+1) + " de " + COACH_STEPS.length;
+  coachTitleEl.textContent = step.title;
+  coachTextEl.textContent = step.text;
+  coachPrev.hidden = coachIndex === 0;
+  coachNext.textContent = coachIndex === COACH_STEPS.length - 1 ? "Entendido" : "Siguiente →";
+  requestAnimationFrame(positionCoachStep);
+}
+function openCoach(){
+  coachIndex = 0;
+  coachLastFocused = document.activeElement;
+  // El recorrido siempre empieza en el selector de familias del Catálogo
+  // (donde viven sus 3 pasos): si alguien lo reabre a mano desde dentro de
+  // una familia ya abierta, o desde Práctica, lo llevamos ahí primero.
+  closePresent();
+  closeWelcome();
+  document.body.classList.remove("projection");
+  selectTab("catalogo");
+  showFamilySelector();
+  coachOverlay.hidden = false;
+  if(wrapEl) wrapEl.inert = true;
+  renderCoachStep();
+  coachNext.focus();
+}
+function closeCoach(markDone){
+  if(coachOverlay.hidden) return;
+  coachOverlay.hidden = true;
+  if(wrapEl) wrapEl.inert = false;
+  if(markDone){ markOnboard("phase1Done"); }
+  if(coachLastFocused && typeof coachLastFocused.focus === "function" && coachLastFocused !== document.body){
+    coachLastFocused.focus();
+  } else {
+    aboutBtn.focus();
+  }
+}
+coachNext.addEventListener("click", function(){
+  if(coachIndex < COACH_STEPS.length - 1){ coachIndex++; renderCoachStep(); }
+  else { closeCoach(true); }
+});
+coachPrev.addEventListener("click", function(){
+  if(coachIndex > 0){ coachIndex--; renderCoachStep(); }
+});
+coachSkip.addEventListener("click", function(){ closeCoach(true); });
+document.addEventListener("keydown", function(e){
+  if(coachOverlay.hidden) return;
+  if(e.key === "Escape") closeCoach(true);
+});
+window.addEventListener("resize", function(){
+  if(!coachOverlay.hidden) positionCoachStep();
+});
+window.addEventListener("scroll", function(){
+  if(!coachOverlay.hidden) positionCoachStep();
+}, true);
+
+// ---- Fase 2: pistas contextuales durante los primeros casos ----
+// qIndex identifica la posición DENTRO de esta ronda (0 = primer caso de
+// la ronda), no una falacia fija — como estas tres pistas hablan de ideas
+// generales (qué es un argumento, qué es una falacia, que esto no
+// califica) y no del contenido de un caso puntual, no importa cuál de los
+// 36 enunciados le toque a cada una. "when" marca el momento exacto:
+// "render" apenas se muestra el caso, "feedback" apenas aparece la
+// primera retroalimentación (acierto, pista de primer intento o cierre).
+const PRACTICE_TIPS = [
+  {
+    id: "tip-argumento", qIndex: 0, when: "render",
+    anchor: "#statementText", side: "bottom",
+    title: "Un mini-argumento",
+    text: "Cada caso es un argumento corto: unas razones que intentan sostener una conclusión. Busca dónde falla el razonamiento, no si la frase \"suena\" a verdad o a mentira."
+  },
+  {
+    id: "tip-falacia", qIndex: 0, when: "feedback",
+    anchor: "#feedbackBox", side: "top",
+    title: "¿Qué es una falacia?",
+    text: "Es un argumento que parece válido pero no logra apoyar su conclusión con razones reales. Por eso siempre te explicamos el porqué, no solo si acertaste."
+  },
+  {
+    id: "tip-no-nota", qIndex: 2, when: "render",
+    anchor: ".score-group", side: "bottom",
+    title: "Esto no califica",
+    text: "No hay nota ni tabla de posiciones. Falla las veces que necesites: lo que importa es que entiendas el porqué."
+  }
+];
+let activeTip = null;
+function dismissActiveTip(){
+  if(!activeTip) return;
+  window.removeEventListener("resize", activeTip.reposition);
+  window.removeEventListener("scroll", activeTip.reposition, true);
+  activeTip.el.remove();
+  activeTip = null;
+}
+function showTip(tip){
+  const anchor = document.querySelector(tip.anchor);
+  if(!anchor) return;
+  dismissActiveTip();
+  const callout = document.createElement("div");
+  callout.className = "tip-callout";
+  callout.setAttribute("role", "status");
+  const title = document.createElement("div");
+  title.className = "tip-title";
+  title.textContent = tip.title;
+  const text = document.createElement("p");
+  text.className = "tip-text";
+  text.textContent = tip.text;
+  const dismissBtn = document.createElement("button");
+  dismissBtn.type = "button";
+  dismissBtn.className = "ghost-btn tip-dismiss";
+  dismissBtn.textContent = "Entendido";
+  callout.appendChild(title);
+  callout.appendChild(text);
+  callout.appendChild(dismissBtn);
+  document.body.appendChild(callout);
+
+  function reposition(){ positionFloatingBox(callout, anchor, tip.side); }
+  reposition();
+  window.addEventListener("resize", reposition);
+  window.addEventListener("scroll", reposition, true);
+  activeTip = { el: callout, reposition: reposition };
+
+  dismissBtn.addEventListener("click", function(){
+    markOnboard(tip.id);
+    dismissActiveTip();
+  });
+}
+function maybeShowTip(when, roundIndex){
+  if(coachOverlay && !coachOverlay.hidden) return; // no pisar el recorrido guiado
+  const tip = PRACTICE_TIPS.filter(function(t){
+    return t.when === when && t.qIndex === roundIndex && !onboardDone(t.id);
+  })[0];
+  if(tip) showTip(tip);
+}
+
+// Se abre solo en la primera visita (nunca si ya se completó o se saltó
+// antes). Un pequeño respiro deja que la fuente y el layout terminen de
+// asentarse antes de medir posiciones para el primer paso.
+if(onboardState && !onboardState.phase1Done){
+  window.setTimeout(openCoach, 400);
+}
+
+// A partir de aquí ya existen PRACTICE_TIPS, coachOverlay y onboardState:
+// renderQuestion()/showHint()/closeCase()/selectTab() pueden llamar a
+// maybeShowTip() con seguridad.
+onboardingReady = true;
+// El primer caso ya se renderizó (en caliente, al cargar el módulo) antes
+// de que esta bandera existiera, así que su propio renderQuestion() nunca
+// pudo avisarle a la Fase 2. Si la persona ya está parada en Práctica al
+// llegar a este punto (poco común, pero posible si recarga con el hash o
+// el estado de la pestaña ya en "practica"), se lo avisamos ahora mismo.
+if(viewPractica.classList.contains("active")){
+  maybeShowTip("render", qIndex);
+}

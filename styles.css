@@ -210,6 +210,9 @@
   }
   .toggle-btn:hover{background:rgba(255,255,255,.17);border-color:var(--accent);}
   .toggle-btn[aria-pressed="true"]:hover{filter:brightness(1.08);border-color:transparent;}
+  /* aria-hidden en el HTML: el ícono es puro adorno, "Sonido" ya es el
+     nombre accesible del botón por sí solo. */
+  .sound-icon{font-size:14px;}
   nav.tabs{
     display:flex;
     gap:4px;
@@ -601,6 +604,20 @@
   /* stroke=currentColor / fill=currentColor en los SVG: heredan el color
      ámbar o lila de cada pill automáticamente, sin fijar un color aparte. */
   .score-pill-icon{width:14px;height:14px;flex:none;}
+  /* Refuerzo visual breve cada vez que un contador cambia (bumpPill() en
+     app.js): un pulso de escala muy corto, contraparte visual del anuncio
+     por aria-live y del sonido de retroalimentación. Nunca cambia el
+     tamaño del layout alrededor (transform, no width/height), así que no
+     empuja ni reacomoda nada vecino. */
+  .score-pill.pill-bump{animation:pillBump .3s ease;}
+  @keyframes pillBump{
+    0%{transform:scale(1);}
+    40%{transform:scale(1.1);}
+    100%{transform:scale(1);}
+  }
+  @media (prefers-reduced-motion: reduce){
+    .score-pill.pill-bump{animation:none;}
+  }
   /* Marco fijo sobre el enunciado: la misma pregunta en cada caso, para que
      la práctica se sienta como un interrogatorio activo y no como un ítem
      de examen suelto. */
@@ -640,11 +657,15 @@
   /* Sello "CASO RESUELTO": puramente decorativo (aria-hidden en el HTML),
      aparece solo al acertar. Rotado como un sello de archivo real, con
      fondo propio para que se lea encima de cualquier parte del enunciado
-     sobre el que caiga. */
+     sobre el que caiga.
+     float:right (no position:absolute) a propósito: así el propio motor de
+     layout reacomoda el texto alrededor del sello — nunca se superponen,
+     sin importar cuántos caracteres tenga el enunciado ni dónde caiga el
+     salto de línea. Requiere que el HTML lo ubique ANTES del span de texto
+     (los floats solo empujan al contenido que los sigue en el DOM). */
   .case-stamp{
-    position:absolute;
-    top:10px;
-    right:14px;
+    float:right;
+    margin:0 0 10px 14px;
     border:2.5px solid var(--good);
     color:var(--good);
     background:rgba(8,6,26,.55);
@@ -673,7 +694,7 @@
     .case-stamp{animation:none;}
   }
   @media (max-width:480px){
-    .case-stamp{font-size:9.5px;padding:4px 8px;top:6px;right:8px;}
+    .case-stamp{font-size:9.5px;padding:4px 8px;margin:0 0 8px 10px;}
   }
   .options{
     display:grid;
@@ -1140,7 +1161,10 @@
   #welcomeOverlay .present-text{margin:0 0 14px;}
   #welcomeOverlay .present-text:last-of-type{margin-bottom:0;}
   .welcome-title{font-size:clamp(26px,4.5vw,42px);margin-bottom:18px;position:relative;}
-  .welcome-actions{display:flex;justify-content:flex-end;margin-top:22px;}
+  /* Dos botones desde que esta pantalla dejó de ser el único paso de la
+     inducción: uno para reabrir el recorrido guiado (secundario, a la
+     izquierda) y "Entendido" para cerrar (primario, a la derecha). */
+  .welcome-actions{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:22px;flex-wrap:wrap;}
   /* Marca de agua decorativa: reutiliza el mismo dibujo de la lupa del
      logo del encabezado (mismo <svg>, mismos valores de círculo+línea) en
      vez de un ícono nuevo, para que esta pantalla —la más cargada de texto
@@ -1174,4 +1198,120 @@
   @media (max-width:480px){
     header.top{flex-direction:column;}
     .top-controls{align-self:flex-start;}
+  }
+
+  /* ---------- Inducción progresiva: Fase 1 (recorrido guiado) ---------- */
+  /* Contenedor a pantalla completa: no lleva fondo propio, solo posiciona
+     el recorte (coach-highlight) y la burbuja (coach-bubble) por encima de
+     todo lo demás, incluida la pantalla de bienvenida (z-index:100). */
+  .coach-overlay{
+    position:fixed;
+    inset:0;
+    z-index:110;
+  }
+  .coach-overlay[hidden]{display:none;}
+  /* El "recorte" no es un agujero real: es un rectángulo con un borde y una
+     sombra tan grande (9999px) que cubre el resto de la pantalla, oscureciéndola
+     entera salvo por este rectángulo. pointer-events:none porque es puro
+     dibujo — no debe robarle clics al elemento real que está debajo. */
+  .coach-highlight{
+    position:fixed;
+    z-index:111;
+    border-radius:12px;
+    border:2px solid var(--accent);
+    box-shadow:0 0 0 9999px rgba(3,3,9,.78);
+    pointer-events:none;
+    transition:top .25s ease, left .25s ease, width .25s ease, height .25s ease;
+  }
+  @media (prefers-reduced-motion: reduce){
+    .coach-highlight{transition:none;}
+  }
+  .coach-bubble{
+    position:fixed;
+    z-index:112;
+    max-width:320px;
+    background:var(--glass-bg-strong);
+    -webkit-backdrop-filter:var(--glass-blur);
+    backdrop-filter:var(--glass-blur);
+    border:1px solid var(--line);
+    border-radius:16px;
+    padding:18px 20px;
+    box-shadow:0 12px 30px rgba(0,0,0,.5);
+  }
+  .coach-step{
+    font-family:var(--font-mono);
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:.06em;
+    color:var(--ink-soft);
+    text-transform:uppercase;
+    margin-bottom:6px;
+  }
+  .coach-title{
+    font-family:var(--font-display);
+    font-size:18px;
+    margin:0 0 6px;
+    color:var(--ink);
+  }
+  .coach-text{
+    font-size:14px;
+    color:var(--ink-soft);
+    margin:0 0 14px;
+    line-height:1.5;
+  }
+  .coach-actions{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+  }
+  .coach-nav{display:flex;gap:8px;}
+  /* Botones de tamaño reducido: la burbuja es angosta y "Saltar" +
+     "← Atrás" + "Siguiente →" no caben con el padding normal de .ghost-btn. */
+  .coach-skip, .coach-prev, .coach-next{padding:9px 14px;font-size:13px;}
+
+  /* ---------- Inducción progresiva: Fase 2 (pistas contextuales) ---------- */
+  /* No es un modal: role="status" en el HTML/JS (no role="dialog"), no
+     bloquea el resto de la interfaz y no usa inert — la persona puede
+     seguir interactuando con el caso mientras la pista está a la vista.
+     z-index por debajo del recorrido guiado y de la pantalla de bienvenida
+     (110/100) para que, si por algún motivo coincidieran, esos dos ganen. */
+  .tip-callout{
+    position:fixed;
+    z-index:90;
+    max-width:300px;
+    background:var(--glass-bg-strong);
+    -webkit-backdrop-filter:var(--glass-blur);
+    backdrop-filter:var(--glass-blur);
+    border:1px solid var(--accent);
+    border-radius:14px;
+    padding:14px 16px;
+    box-shadow:0 10px 24px rgba(0,0,0,.45);
+    animation:tipPop .25s ease;
+  }
+  .tip-title{
+    font-family:var(--font-mono);
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:.05em;
+    color:var(--accent);
+    text-transform:uppercase;
+    margin-bottom:4px;
+  }
+  .tip-text{
+    font-size:13.5px;
+    color:var(--ink);
+    margin:0 0 10px;
+    line-height:1.45;
+  }
+  .tip-dismiss{padding:8px 14px;font-size:13px;}
+  @keyframes tipPop{
+    from{opacity:0;transform:translateY(6px);}
+    to{opacity:1;transform:translateY(0);}
+  }
+  @media (prefers-reduced-motion: reduce){
+    .tip-callout{animation:none;}
+  }
+  @media (max-width:480px){
+    .coach-bubble, .tip-callout{max-width:calc(100vw - 24px);}
   }
