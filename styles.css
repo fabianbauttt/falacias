@@ -263,6 +263,15 @@
   .intro strong{color:var(--ink);}
 
   section.category{margin-bottom:38px;}
+  /* Mini-práctica de la familia: mismo "vidrio" que .practice-frame (ver
+     setupFamilyQuiz en app.js), solo con el espacio extra que necesita por
+     venir después de la cuadrícula de expedientes en vez de estar sola. */
+  .family-quiz{margin-top:28px;}
+  .fq-done p{
+    margin:0 0 16px;
+    color:var(--ink-soft);
+    font-size:14.5px;
+  }
   .category-head{margin-bottom:14px;}
   .category-head .row{
     display:flex;

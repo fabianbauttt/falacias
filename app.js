@@ -90,6 +90,220 @@ function catIconEl(catKey, wrapperClass){
   return span;
 }
 
+// ---------- Mini-práctica por familia ----------
+// Al final de cada familia del Catálogo: 3 casos, uno por cada falacia de
+// esa familia, con la misma mecánica de dos intentos + pista de la
+// Práctica general (mismas clases CSS — .opt-btn, .feedback, .case-stamp —
+// así que hereda sus animaciones y sonidos de retroalimentación tal cual,
+// sin duplicar ni un solo keyframe). A propósito NO toca los contadores
+// globales (Puntos de Análisis Crítico, Persistencia) ni el Diario de
+// Caza: es un repaso ligero de lo que se acaba de leer en esa familia, no
+// una ronda oficial de Práctica — mezclar sus resultados en esos
+// marcadores confundiría lo que miden. Por la misma razón tampoco guarda
+// ni muestra ningún puntaje al terminar (ver el resto de la app: "sin
+// nota, sin registro"). Cada vez que se entra a la familia (showFamily,
+// más abajo) se vuelve a armar con 3 casos nuevos.
+//
+// Los enunciados salen del mismo banco de 36 (PRACTICE, en data.js), pero
+// EXCLUYENDO siempre el primero de cada falacia: para 11 de las 12
+// falacias, ese primer enunciado es EXACTAMENTE el mismo texto que ya se
+// mostró como "EVIDENCIA" en el expediente que la persona acaba de leer
+// (ver FALLACIES[].example en data.js) — repetirlo aquí premiaría reconocer
+// una frase memorizada, no aplicar la teoría a un caso distinto. Se
+// descarta ese índice para las 12 falacias por igual (no solo para las 11
+// donde coincide textualmente) para no necesitar un caso especial.
+const familyQuizControllers = {};
+
+function practiceIndicesForFallacy(fallacyId){
+  const out = [];
+  PRACTICE.forEach(function(entry, i){ if(entry[0] === fallacyId){ out.push(i); } });
+  return out;
+}
+
+function buildFamilyQuizCases(catKey){
+  const fallaciesInCat = FALLACIES.filter(function(f){ return f.cat === catKey; });
+  const cases = fallaciesInCat.map(function(f){
+    const idxs = practiceIndicesForFallacy(f.id).slice(1);
+    const chosenIdx = idxs[Math.floor(Math.random() * idxs.length)];
+    return { fallacy: f, text: PRACTICE[chosenIdx][1] };
+  });
+  return shuffle(cases);
+}
+
+// Redacción de la retroalimentación, compartida con la Práctica general
+// (showHint/closeCase, más abajo en este archivo): una sola fuente de
+// verdad para el texto, así la mini-práctica nunca dice algo distinto de
+// la Práctica general ante el mismo tipo de resultado.
+function hintFeedback(chosen){
+  return {
+    verdict: "No es " + chosen.name + ".",
+    body: "<p>Recuerda que <strong>" + escapeHtml(chosen.name) + "</strong> ocurre cuando " + escapeHtml(lower1(chosen.def)) + " Vuelve a leer el enunciado e intenta de nuevo.</p>"
+  };
+}
+function closeFeedback(chosen, correctFallacy, isCorrect){
+  if(isCorrect){
+    return {
+      verdict: "¡Exacto! Es " + correctFallacy.name + ".",
+      body: "<p>" + escapeHtml(correctFallacy.why) + "</p>"
+    };
+  }
+  return {
+    verdict: "No — es " + correctFallacy.name + ", no " + chosen.name + ".",
+    body: "<p><strong>" + escapeHtml(chosen.name) + "</strong> es cuando " + escapeHtml(lower1(chosen.def)) + " No es lo que pasa en este caso.</p>" +
+          "<p><strong>" + escapeHtml(correctFallacy.name) + "</strong> sí aplica: " + escapeHtml(lower1(correctFallacy.why)) + "</p>"
+  };
+}
+
+// Arma el controlador de la mini-práctica de UNA familia (se llama una vez
+// por familia, al construir el catálogo). container es el <div> ya
+// insertado en el DOM de esa familia; start() (guardado en
+// familyQuizControllers[catKey]) es lo único que showFamily() necesita
+// para (re)lanzarla cada vez que se entra a esta familia.
+function setupFamilyQuiz(catKey, container){
+  container.innerHTML =
+    '<h3 class="journal-title family-quiz-title" tabindex="-1">Practica esta familia</h3>' +
+    '<p class="journal-intro">Aplica lo que acabas de leer: 3 casos, solo de esta familia. Misma mecánica que la Práctica general — dos intentos con pista, sin nota.</p>' +
+    '<div class="fq-body"></div>';
+  const titleEl = container.querySelector(".family-quiz-title");
+  const body = container.querySelector(".fq-body");
+  let cases, idx;
+
+  function renderDone(){
+    body.innerHTML =
+      '<div class="fq-done">' +
+        '<p>Revisaste los 3 casos de esta familia.</p>' +
+        '<div class="journal-actions"><button type="button" class="ghost-btn fq-restart">Practicar de nuevo →</button></div>' +
+      '</div>';
+    const restartBtn = body.querySelector(".fq-restart");
+    restartBtn.addEventListener("click", function(){ start(true); });
+    restartBtn.focus();
+  }
+
+  function renderCase(){
+    const c = cases[idx];
+    let attempts = 0;
+    let resolved = false;
+
+    // Mismo marcado que #statementText/#optionsRoot/#feedbackBox de la
+    // Práctica general (ver index.html), pero sin ids: puede haber hasta 4
+    // instancias de esto en el DOM a la vez (una por familia, aunque solo
+    // una sección quede visible), así que se consulta todo por clase,
+    // acotado a este `body` en particular.
+    body.innerHTML =
+      '<div class="practice-meta"><span>Caso ' + (idx + 1) + ' de ' + cases.length + '</span></div>' +
+      '<p class="case-prompt">¿Qué falacia se esconde aquí?</p>' +
+      '<div class="statement">' +
+        '<div class="case-stamp" aria-hidden="true" hidden>CASO<br>RESUELTO</div>' +
+        '<span class="statement-text"></span>' +
+      '</div>' +
+      '<div class="options"></div>' +
+      '<div class="feedback" aria-live="polite" aria-atomic="true">' +
+        '<div class="verdict"></div><div class="fq-feedback-body"></div>' +
+      '</div>' +
+      '<div class="next-row"><button type="button" class="next-btn" disabled>Siguiente caso →</button></div>';
+
+    const stampEl = body.querySelector(".case-stamp");
+    const textEl = body.querySelector(".statement-text");
+    const statementEl = body.querySelector(".statement");
+    const optionsEl = body.querySelector(".options");
+    const feedbackEl = body.querySelector(".feedback");
+    const verdictEl = body.querySelector(".verdict");
+    const feedbackBodyEl = body.querySelector(".fq-feedback-body");
+    const nextBtnEl = body.querySelector(".next-btn");
+    statementEl.tabIndex = -1;
+    textEl.textContent = c.text;
+
+    const options = pickOptions(c.fallacy);
+    const letters = ["A","B","C","D"];
+    options.forEach(function(opt, i){
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "opt-btn";
+      btn.dataset.fid = opt.id;
+      const letter = document.createElement("span");
+      letter.className = "opt-letter";
+      letter.textContent = letters[i];
+      const label = document.createElement("span");
+      label.textContent = opt.name;
+      btn.appendChild(letter);
+      btn.appendChild(label);
+      btn.addEventListener("click", function(){ handleAnswerFq(opt, btn); });
+      optionsEl.appendChild(btn);
+    });
+
+    function close(chosen, isCorrect){
+      resolved = true;
+      Array.prototype.forEach.call(optionsEl.children, function(b){
+        b.disabled = true;
+        if(b.dataset.fid === c.fallacy.id){ b.classList.add("correct"); }
+      });
+      const fb = closeFeedback(chosen, c.fallacy, isCorrect);
+      feedbackEl.classList.remove("hint");
+      feedbackEl.classList.add("show", isCorrect ? "good" : "bad");
+      verdictEl.textContent = fb.verdict;
+      feedbackBodyEl.innerHTML = fb.body;
+      if(isCorrect){ stampEl.hidden = false; }
+      nextBtnEl.disabled = false;
+      nextBtnEl.focus();
+      scrollIntoViewPolite(nextBtnEl);
+    }
+
+    function handleAnswerFq(chosen, btn){
+      if(resolved || btn.disabled) return;
+      attempts++;
+      const isCorrect = chosen.id === c.fallacy.id;
+
+      if(isCorrect){
+        playSfx("correct");
+        close(chosen, true);
+        return;
+      }
+
+      btn.classList.add("wrong");
+      btn.disabled = true;
+
+      if(attempts < 2){
+        playSfx("hint");
+        const fb = hintFeedback(chosen);
+        feedbackEl.classList.remove("good","bad");
+        feedbackEl.classList.add("show","hint");
+        verdictEl.textContent = fb.verdict;
+        feedbackBodyEl.innerHTML = fb.body;
+        scrollIntoViewPolite(feedbackEl);
+        const nextOption = Array.prototype.find.call(optionsEl.children, function(b){ return !b.disabled; });
+        if(nextOption) nextOption.focus();
+      } else {
+        playSfx("final");
+        close(chosen, false);
+      }
+    }
+
+    nextBtnEl.addEventListener("click", function(){
+      idx++;
+      if(idx < cases.length){
+        renderCase();
+        body.querySelector(".statement").focus();
+      } else {
+        renderDone();
+      }
+    });
+  }
+
+  // moveFocus: false en el primer armado (showFamily ya enfoca el botón
+  // "← Todos los modus operandi" justo después, ver más abajo — enfocar
+  // también aquí sería un salto de foco redundante); true al reiniciar
+  // desde "Practicar de nuevo", donde sí conviene volver a anunciar el
+  // título de esta sección.
+  function start(moveFocus){
+    cases = buildFamilyQuizCases(catKey);
+    idx = 0;
+    renderCase();
+    if(moveFocus){ titleEl.focus(); }
+  }
+
+  familyQuizControllers[catKey] = { start: start };
+}
+
 // ---------- Catalog ----------
 const catalogRoot = document.getElementById("catalog-root");
 CAT_ORDER.forEach(function(catKey){
@@ -203,6 +417,16 @@ CAT_ORDER.forEach(function(catKey){
   });
 
   section.appendChild(grid);
+
+  // Mini-práctica de esta familia: reutiliza el mismo "vidrio" que la
+  // Práctica general (.practice-frame), así el cambio de leer expedientes
+  // a resolver casos se siente como parte de la misma app, no como una
+  // pantalla aparte.
+  const quizContainer = document.createElement("div");
+  quizContainer.className = "practice-frame family-quiz";
+  section.appendChild(quizContainer);
+  setupFamilyQuiz(catKey, quizContainer);
+
   catalogRoot.appendChild(section);
 });
 
@@ -265,6 +489,10 @@ function showFamily(catKey, triggerEl){
     section.hidden = section.dataset.cat !== catKey;
   });
   familyBackBtn.focus();
+  // Cada vez que se entra a una familia se arma su mini-práctica con 3
+  // casos nuevos (ver "Mini-práctica por familia" más arriba) — sin
+  // guardar nada entre visitas, igual que el resto del Catálogo.
+  if(familyQuizControllers[catKey]){ familyQuizControllers[catKey].start(); }
 }
 function showFamilySelector(){
   familySelectorRoot.hidden = false;
@@ -682,9 +910,12 @@ function renderQuestion(moveFocusToFirstOption){
 function showHint(chosen){
   feedbackBox.classList.remove("good","bad");
   feedbackBox.classList.add("show","hint");
-  feedbackVerdict.textContent = "No es " + chosen.name + ".";
-  feedbackBody.innerHTML =
-    "<p>Recuerda que <strong>" + escapeHtml(chosen.name) + "</strong> ocurre cuando " + escapeHtml(lower1(chosen.def)) + " Vuelve a leer el enunciado e intenta de nuevo.</p>";
+  // Texto compartido con la mini-práctica de familia (ver hintFeedback,
+  // definida junto al resto de "Mini-práctica por familia" más arriba):
+  // una sola fuente de verdad para esta redacción.
+  const fb = hintFeedback(chosen);
+  feedbackVerdict.textContent = fb.verdict;
+  feedbackBody.innerHTML = fb.body;
   scrollIntoViewPolite(feedbackBox);
 
   if(onboardingReady) maybeShowTip("feedback", qIndex);
@@ -719,19 +950,17 @@ function closeCase(chosen, correctFallacy, isCorrect){
   feedbackBox.classList.remove("hint");
   feedbackBox.classList.add("show", isCorrect ? "good" : "bad");
 
+  // Texto compartido con la mini-práctica de familia (ver closeFeedback,
+  // definida junto al resto de "Mini-práctica por familia" más arriba).
+  const fb = closeFeedback(chosen, correctFallacy, isCorrect);
+  feedbackVerdict.textContent = fb.verdict;
+  feedbackBody.innerHTML = fb.body;
   if(isCorrect){
-    feedbackVerdict.textContent = "¡Exacto! Es " + correctFallacy.name + ".";
-    feedbackBody.innerHTML = "<p>" + escapeHtml(correctFallacy.why) + "</p>";
     // Sello "CASO RESUELTO": solo en el cierre CORRECTO (da igual si fue al
     // primer o al segundo intento — un acierto vale lo mismo en toda esta
     // app, ver criticalAnalysisPoints más arriba). Puramente decorativo: el
     // acierto ya lo anuncia el texto de arriba en el aria-live.
     caseStamp.hidden = false;
-  } else {
-    feedbackVerdict.textContent = "No — es " + correctFallacy.name + ", no " + chosen.name + ".";
-    feedbackBody.innerHTML =
-      "<p><strong>" + escapeHtml(chosen.name) + "</strong> es cuando " + escapeHtml(lower1(chosen.def)) + " No es lo que pasa en este caso.</p>" +
-      "<p><strong>" + escapeHtml(correctFallacy.name) + "</strong> sí aplica: " + escapeHtml(lower1(correctFallacy.why)) + "</p>";
   }
 
   nextBtn.disabled = false;
