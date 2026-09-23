@@ -377,11 +377,24 @@
     color:var(--ink);
     margin:0 0 4px;
   }
+  /* Kicker "MODUS OPERANDI": una etiqueta más del expediente, como
+     DEFINICIÓN o EVIDENCIA en el detalle — solo que en miniatura porque
+     vive en la cabecera compacta y clicable de la tarjeta. */
+  .card .hook-label{
+    display:block;
+    font-family:var(--font-mono);
+    font-size:9.5px;
+    font-weight:700;
+    letter-spacing:0.08em;
+    color:var(--ink-soft);
+    opacity:.75;
+    margin:6px 0 1px;
+  }
   .card .hook{
     display:block;
     font-size:13.5px;
     color:var(--ink-soft);
-    margin:2px 0 0;
+    margin:0;
   }
   .card .expand-icon{
     display:inline-flex;
@@ -560,6 +573,9 @@
     flex-wrap:wrap;
   }
   .score-pill{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
     background:var(--accent-soft);
     color:var(--accent);
     padding:4px 10px;
@@ -580,6 +596,20 @@
   .score-pill.persistence-pill{
     background:var(--warn-soft);
     color:var(--warn);
+  }
+  /* stroke=currentColor / fill=currentColor en los SVG: heredan el color
+     ámbar o lila de cada pill automáticamente, sin fijar un color aparte. */
+  .score-pill-icon{width:14px;height:14px;flex:none;}
+  /* Marco fijo sobre el enunciado: la misma pregunta en cada caso, para que
+     la práctica se sienta como un interrogatorio activo y no como un ítem
+     de examen suelto. */
+  .case-prompt{
+    font-family:var(--font-mono);
+    font-size:12px;
+    font-weight:700;
+    letter-spacing:0.05em;
+    color:var(--ink-soft);
+    margin:0 0 8px;
   }
   .statement{
     font-family:var(--font-display);
@@ -606,6 +636,44 @@
     margin-right:2px;
   }
   .statement::after{content:"”";font-family:var(--font-display);color:var(--accent);font-size:1.3em;}
+  /* Sello "CASO RESUELTO": puramente decorativo (aria-hidden en el HTML),
+     aparece solo al acertar. Rotado como un sello de archivo real, con
+     fondo propio para que se lea encima de cualquier parte del enunciado
+     sobre el que caiga. */
+  .case-stamp{
+    position:absolute;
+    top:10px;
+    right:14px;
+    border:2.5px solid var(--good);
+    color:var(--good);
+    background:rgba(8,6,26,.55);
+    font-family:var(--font-mono);
+    font-weight:700;
+    font-size:11px;
+    line-height:1.25;
+    letter-spacing:0.06em;
+    text-align:center;
+    padding:5px 10px;
+    border-radius:8px;
+    transform:rotate(-9deg);
+    pointer-events:none;
+    animation:stampImpact .4s ease;
+  }
+  .case-stamp[hidden]{display:none;}
+  @keyframes stampImpact{
+    0%{opacity:0; transform:rotate(-9deg) scale(1.6);}
+    60%{opacity:1; transform:rotate(-9deg) scale(0.92);}
+    100%{opacity:1; transform:rotate(-9deg) scale(1);}
+  }
+  /* Va después de la regla base de .case-stamp a propósito — misma
+     especificidad, gana la que aparece más abajo en la cascada (ver el
+     mismo criterio ya aplicado a .skill-bar-fill y a .journal). */
+  @media (prefers-reduced-motion: reduce){
+    .case-stamp{animation:none;}
+  }
+  @media (max-width:480px){
+    .case-stamp{font-size:9.5px;padding:4px 8px;top:6px;right:8px;}
+  }
   .options{
     display:grid;
     grid-template-columns:1fr;
@@ -892,6 +960,16 @@
     border:1px solid var(--line);
     overflow:hidden;
   }
+  /* Etiqueta cualitativa (trailLabel en app.js): describe qué tan visible
+     fue el patrón, no una nota — por eso va en tono neutro (ink-soft, sin
+     color de semáforo) y en cursiva, como una observación al margen del
+     dato numérico de arriba, no como un segundo veredicto. */
+  .skill-row-trail{
+    font-size:12px;
+    font-style:italic;
+    color:var(--ink-soft);
+    margin-top:5px;
+  }
   .skill-bar-fill{
     height:100%;
     border-radius:999px;
@@ -935,7 +1013,9 @@
   /* Projection mode (Práctica view: enlarge in place, it's already one-case-at-a-time) */
   body.projection .wrap{max-width:1100px;}
   body.projection .practice-meta{font-size:15px;}
+  body.projection .case-prompt{font-size:15px;}
   body.projection .statement{font-size:clamp(24px,4vw,34px);padding:26px 28px;}
+  body.projection .case-stamp{font-size:14px;padding:7px 14px;}
   body.projection .opt-btn{font-size:18px;padding:16px 18px;}
   body.projection .feedback{font-size:17px;}
   body.projection nav.tabs button{font-size:19px;}
@@ -943,6 +1023,7 @@
   body.projection .journal-intro{font-size:17px;}
   body.projection .skill-row-label{font-size:18px;}
   body.projection .skill-row-pct{font-size:15px;}
+  body.projection .skill-row-trail{font-size:14px;}
   body.projection .journal-meta .score-pill{font-size:15px;}
 
   /* Presentation overlay (Catálogo view: one expediente at a time) */
@@ -1013,6 +1094,10 @@
     letter-spacing:0.05em;
     margin:16px 0 6px;
   }
+  /* Se sienta pegado al nombre (kicker), no espaciado como las etiquetas
+     de más abajo (DEFINICIÓN, POR QUÉ FALLA, EVIDENCIA), que separan
+     bloques de párrafo distintos. */
+  .present-label-hook{margin-top:0;}
   .present-text{
     font-size:clamp(17px,2vw,21px);
     line-height:1.5;

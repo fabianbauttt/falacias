@@ -43,7 +43,7 @@
     </nav>
 
     <section class="view active" id="view-catalogo" role="tabpanel" aria-labelledby="tab-catalogo">
-      <p class="intro">Doce falacias comunes, agrupadas en cuatro familias según <strong>cómo</strong> engañan: distrayendo del argumento, presionando socialmente, torciendo la evidencia o forzando la estructura lógica. Elige una familia para ver sus expedientes, o usa "Modo proyección" para revisarlas todas, una por una, con el curso.</p>
+      <p class="intro">Doce falacias comunes, agrupadas en cuatro modus operandi según <strong>cómo</strong> engañan: distrayendo del argumento, presionando socialmente, torciendo la evidencia o forzando la estructura lógica. Elige una familia para ver sus expedientes, o usa "Modo proyección" para revisarlas todas, una por una, con el curso.</p>
       <div id="familySelectorRoot" class="family-grid"></div>
       <div class="family-back-row" id="familyBackRow" hidden>
         <button class="ghost-btn" id="familyBackBtn" type="button">← Todas las familias</button>
@@ -56,11 +56,34 @@
         <div class="practice-meta">
           <span id="progressLabel">Caso 1 de 36</span>
           <div class="score-group">
-            <span class="score-pill" id="scoreLabel">Puntos de Análisis Crítico: 0</span>
-            <span class="score-pill persistence-pill" id="attemptsLabel">Persistencia: 0 intentos</span>
+            <!-- Ícono puramente decorativo (aria-hidden): la lupa del
+                 detective para el contador que suma cada acierto de
+                 análisis crítico. -->
+            <span class="score-pill" id="scoreLabel">
+              <svg class="score-pill-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="6.5"/><line x1="14.8" y1="14.8" x2="21" y2="21"/></svg>
+              <span id="scoreLabelText">Puntos de Análisis Crítico: 0</span>
+            </span>
+            <!-- Huella: el rastro que deja la persistencia (cada intento,
+                 acierte o no, es un paso más en la investigación). -->
+            <span class="score-pill persistence-pill" id="attemptsLabel">
+              <svg class="score-pill-icon" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true" focusable="false"><ellipse cx="12" cy="16.5" rx="5" ry="6"/><circle cx="6.3" cy="7.5" r="2.2"/><circle cx="12" cy="5.3" r="2.2"/><circle cx="17.7" cy="7.5" r="2.2"/></svg>
+              <span id="attemptsLabelText">Persistencia: 0 intentos</span>
+            </span>
           </div>
         </div>
-        <div class="statement" id="statementText">Cargando...</div>
+        <!-- Marco fijo de la investigación: no cambia caso a caso (a
+             diferencia del texto de adentro), así que vive en el HTML
+             estático en vez de reescribirse en cada renderQuestion(). -->
+        <p class="case-prompt">¿Qué falacia se esconde aquí?</p>
+        <div class="statement" id="statementText">
+          <span class="statement-text" id="statementTextInner">Cargando...</span>
+          <!-- Sello decorativo: closeCase() lo destapa solo cuando el caso
+               se cierra con acierto (en el primer intento o en el segundo,
+               da igual) y renderQuestion() lo vuelve a ocultar en el
+               próximo caso. aria-hidden porque es puro adorno — el acierto
+               ya se anuncia por texto en #feedbackBox. -->
+          <div class="case-stamp" id="caseStamp" aria-hidden="true" hidden>CASO<br>RESUELTO</div>
+        </div>
         <div class="options" id="optionsRoot"></div>
         <div class="feedback" id="feedbackBox" aria-live="polite" aria-atomic="true">
           <div class="verdict" id="feedbackVerdict"></div>
@@ -119,7 +142,7 @@
     <p class="present-text">Un <strong class="term-chip">argumento</strong> es un intento de sostener una conclusión con razones: unas ideas (premisas) que deberían apoyar otra idea, la conclusión. Cuando las razones sí la sostienen, el argumento es bueno. Cuando no la sostienen —aunque suene convincente— hay un error en el razonamiento.</p>
     <p class="present-text">Una <strong class="term-chip">falacia</strong> es justamente eso: un argumento que parece válido, que puede sonar persuasivo o incluso ganarse una discusión, pero que en realidad no logra apoyar su conclusión con razones reales. En vez de dar evidencia, distrae, presiona, tuerce la evidencia o fuerza la estructura del argumento.</p>
     <p class="present-text">Reconocerlas sirve para dos cosas: no dejarte convencer por trucos retóricos —en una discusión, en redes sociales, en publicidad, en política— y para argumentar mejor tú mismo, sin caer en los mismos errores.</p>
-    <p class="present-text">A continuación vas a explorar doce falacias comunes, agrupadas en cuatro familias según <strong>cómo</strong> engañan.</p>
+    <p class="present-text">A continuación vas a explorar doce falacias comunes, agrupadas en cuatro modus operandi según <strong>cómo</strong> engañan.</p>
     <div class="welcome-actions">
       <button class="next-btn" id="welcomeStart" type="button">Empezar →</button>
     </div>

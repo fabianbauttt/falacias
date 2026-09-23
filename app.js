@@ -145,10 +145,18 @@ CAT_ORDER.forEach(function(catKey){
     const titleSpan = document.createElement("span");
     titleSpan.className = "card-top-title";
     titleSpan.textContent = f.name;
+    // Kicker "MODUS OPERANDI": convierte el gancho (antes solo cursiva sin
+    // etiqueta) en un campo más del expediente, igual que DEFINICIÓN, POR
+    // QUÉ FALLA y EVIDENCIA más abajo — refuerza la narrativa de "ficha de
+    // caso" sin cambiar el contenido, solo nombrando qué es ese texto.
+    const hookLabel = document.createElement("span");
+    hookLabel.className = "hook-label";
+    hookLabel.textContent = "Modus operandi";
     const hookSpan = document.createElement("span");
     hookSpan.className = "hook";
     hookSpan.textContent = f.hook;
     textWrap.appendChild(titleSpan);
+    textWrap.appendChild(hookLabel);
     textWrap.appendChild(hookSpan);
     const icon = document.createElement("span");
     icon.className = "expand-icon";
@@ -174,7 +182,7 @@ CAT_ORDER.forEach(function(catKey){
     detail.innerHTML =
       '<div class="label">DEFINICIÓN</div><div>' + escapeHtml(f.def) + '</div>' +
       '<div class="label">POR QUÉ FALLA</div><div>' + escapeHtml(f.why) + '</div>' +
-      '<div class="label">EJEMPLO</div><div class="example-clip">“' + escapeHtml(f.example) + '”</div>';
+      '<div class="label">EVIDENCIA</div><div class="example-clip">“' + escapeHtml(f.example) + '”</div>';
     card.appendChild(detail);
 
     top.addEventListener("click", function(){
@@ -330,12 +338,13 @@ function renderPresent(){
       '<span class="family-icon present-tag-icon">' + catIconSvg(f.cat) + '</span>' + cat.label.toUpperCase() +
     '</span>' +
     '<h2 class="present-name">' + escapeHtml(f.name) + '</h2>' +
+    '<div class="present-label present-label-hook">MODUS OPERANDI</div>' +
     '<p class="present-hook">' + escapeHtml(f.hook) + '</p>' +
     '<div class="present-label">DEFINICIÓN</div>' +
     '<p class="present-text">' + escapeHtml(f.def) + '</p>' +
     '<div class="present-label">POR QUÉ FALLA</div>' +
     '<p class="present-text">' + escapeHtml(f.why) + '</p>' +
-    '<div class="present-label">EJEMPLO</div>' +
+    '<div class="present-label">EVIDENCIA</div>' +
     '<p class="present-example" style="background:' + catSoftBg(f.cat) + '">“' + escapeHtml(f.example) + '”</p>';
   presentPrev.disabled = presentIndex === 0;
   presentNext.disabled = presentIndex === FALLACIES.length - 1;
@@ -441,13 +450,21 @@ function buildQueue(){
 }
 
 const progressLabel = document.getElementById("progressLabel");
-const scoreLabel = document.getElementById("scoreLabel");
-const attemptsLabel = document.getElementById("attemptsLabel");
+// scoreLabel/attemptsLabel ahora envuelven un ícono decorativo además del
+// texto (ver index.html): el texto que cambia con cada respuesta vive en
+// estos spans internos, para no borrar el ícono cada vez que se actualiza.
+const scoreLabelText = document.getElementById("scoreLabelText");
+const attemptsLabelText = document.getElementById("attemptsLabelText");
 const statementText = document.getElementById("statementText");
 // tabindex="-1" inyectado en tiempo de ejecución: permite enfocar el
 // enunciado por script (para que el lector de pantalla lo anuncie al
 // avanzar de caso) sin añadirlo como parada nueva al orden normal de Tab.
 statementText.tabIndex = -1;
+// El texto del caso ya no vive directamente en #statementText: ese
+// elemento pasó a ser un wrapper (para poder alojar el sello "CASO
+// RESUELTO" como hijo aparte) y el texto en sí vive en este span interno.
+const statementTextInner = document.getElementById("statementTextInner");
+const caseStamp = document.getElementById("caseStamp");
 const optionsRoot = document.getElementById("optionsRoot");
 const feedbackBox = document.getElementById("feedbackBox");
 const feedbackVerdict = document.getElementById("feedbackVerdict");
@@ -485,7 +502,10 @@ function renderQuestion(moveFocusToFirstOption){
   const text = entry[1];
   const correctFallacy = byId[correctId];
 
-  statementText.textContent = text;
+  statementTextInner.textContent = text;
+  // El sello es del caso ANTERIOR (si lo hubo): un caso nuevo empieza
+  // siempre sin sello, incluso si el anterior se cerró con acierto.
+  caseStamp.hidden = true;
   progressLabel.textContent = "Caso " + (qIndex+1) + " de " + PRACTICE.length;
 
   const options = pickOptions(correctFallacy);
@@ -561,7 +581,7 @@ function closeCase(chosen, correctFallacy, isCorrect){
   // mismo que uno al primero, porque lo que se está reconociendo es haber
   // resuelto el caso, no la ausencia de error en el camino.
   if(isCorrect){ criticalAnalysisPoints++; }
-  scoreLabel.textContent = "Puntos de Análisis Crítico: " + criticalAnalysisPoints;
+  scoreLabelText.textContent = "Puntos de Análisis Crítico: " + criticalAnalysisPoints;
 
   Array.prototype.forEach.call(optionsRoot.children, function(b){
     b.disabled = true;
@@ -574,6 +594,11 @@ function closeCase(chosen, correctFallacy, isCorrect){
   if(isCorrect){
     feedbackVerdict.textContent = "¡Exacto! Es " + correctFallacy.name + ".";
     feedbackBody.innerHTML = "<p>" + escapeHtml(correctFallacy.why) + "</p>";
+    // Sello "CASO RESUELTO": solo en el cierre CORRECTO (da igual si fue al
+    // primer o al segundo intento — un acierto vale lo mismo en toda esta
+    // app, ver criticalAnalysisPoints más arriba). Puramente decorativo: el
+    // acierto ya lo anuncia el texto de arriba en el aria-live.
+    caseStamp.hidden = false;
   } else {
     feedbackVerdict.textContent = "No — es " + correctFallacy.name + ", no " + chosen.name + ".";
     feedbackBody.innerHTML =
@@ -610,7 +635,7 @@ function handleAnswer(chosen, correctFallacy, btn){
   // pregunta). Enmarca el esfuerzo invertido en la sesión completa como
   // algo que se acumula de forma positiva, no como una tasa de error.
   totalAttempts++;
-  attemptsLabel.textContent = "Persistencia: " + totalAttempts + (totalAttempts === 1 ? " intento" : " intentos");
+  attemptsLabelText.textContent = "Persistencia: " + totalAttempts + (totalAttempts === 1 ? " intento" : " intentos");
   const isCorrect = chosen.id === correctFallacy.id;
 
   if(isCorrect){
@@ -648,6 +673,19 @@ function formatElapsed(ms){
   const seconds = totalSeconds % 60;
   if(minutes === 0){ return seconds + " s"; }
   return minutes + " min " + seconds + " s";
+}
+
+// Describe qué tan visible fue el patrón de esa familia en esta ronda, no
+// qué tan "bien" le fue al estudiante: son los mismos tres tramos que una
+// nota (alto/medio/bajo), pero la palabra elegida describe la dificultad de
+// seguirle el rastro a la falacia, no el desempeño de la persona — a
+// propósito, para no reintroducir el lenguaje de aprobado/reprobado que el
+// resto de esta app evita deliberadamente (ver criticalAnalysisPoints más
+// arriba).
+function trailLabel(pct){
+  if(pct >= 75) return "Rastro claro";
+  if(pct >= 40) return "Rastro parcial";
+  return "Rastro difícil de seguir";
 }
 
 // Construye el gráfico de barras (una fila por familia) y el tiempo total
@@ -688,8 +726,6 @@ function renderJournal(){
 
     const track = document.createElement("div");
     track.className = "skill-bar-track";
-    track.setAttribute("role", "img");
-    track.setAttribute("aria-label", cat.label + ": " + pctSpan.textContent);
     const fill = document.createElement("div");
     fill.className = "skill-bar-fill";
     fill.style.setProperty("--cat-color", catColor(catKey));
@@ -701,8 +737,24 @@ function renderJournal(){
     }
     track.appendChild(fill);
 
-    row.appendChild(head);
-    row.appendChild(track);
+    // Etiqueta cualitativa (ver trailLabel arriba): acompaña al dato
+    // numérico, no lo reemplaza. Solo tiene sentido cuando hubo casos de
+    // esa familia en esta ronda.
+    const trailText = stats.total > 0 ? trailLabel(pct) : "";
+    if(trailText){
+      const trail = document.createElement("div");
+      trail.className = "skill-row-trail";
+      trail.textContent = trailText;
+      row.appendChild(head);
+      row.appendChild(track);
+      row.appendChild(trail);
+    } else {
+      row.appendChild(head);
+      row.appendChild(track);
+    }
+    track.setAttribute("role", "img");
+    track.setAttribute("aria-label", cat.label + ": " + pctSpan.textContent + (trailText ? " — " + trailText : ""));
+
     journalSkills.appendChild(row);
   });
 
