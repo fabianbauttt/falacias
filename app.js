@@ -159,23 +159,48 @@ function closeFeedback(chosen, correctFallacy, isCorrect){
 // insertado en el DOM de esa familia; start() (guardado en
 // familyQuizControllers[catKey]) es lo único que showFamily() necesita
 // para (re)lanzarla cada vez que se entra a esta familia.
+//
+// Colapsada por defecto, igual que los expedientes de falacia: un
+// encabezado clicable (mismo patrón .card-top/.card-detail que ya usan los
+// expedientes, ver más abajo en este archivo) revela el contenido recién
+// al hacer clic, para no ensuciar la pantalla con una ronda de práctica
+// completa apenas se abre la familia.
 function setupFamilyQuiz(catKey, container){
+  const detailId = "quiz-detail-" + catKey;
   container.innerHTML =
-    '<h3 class="journal-title family-quiz-title" tabindex="-1">Practica esta familia</h3>' +
-    '<p class="journal-intro">Aplica lo que acabas de leer: 3 casos, solo de esta familia. Misma mecánica que la Práctica general — dos intentos con pista, sin nota.</p>' +
-    '<div class="fq-body"></div>';
-  const titleEl = container.querySelector(".family-quiz-title");
+    '<h3 class="card-top-heading">' +
+      '<button type="button" class="card-top family-quiz-top" aria-expanded="false" aria-controls="' + detailId + '">' +
+        '<span class="card-top-text">' +
+          '<span class="card-top-title">Practica este modus operandi</span>' +
+          '<span class="fq-top-hint">3 casos para aplicar lo que acabas de leer</span>' +
+        '</span>' +
+        '<span class="expand-icon" aria-hidden="true">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><polyline points="6 9 12 15 18 9"/></svg>' +
+        '</span>' +
+      '</button>' +
+    '</h3>' +
+    '<div class="family-quiz-detail" id="' + detailId + '">' +
+      '<p class="journal-intro">Misma mecánica que la Práctica general — dos intentos con pista, sin nota.</p>' +
+      '<div class="fq-body"></div>' +
+    '</div>';
+  const toggleBtn = container.querySelector(".family-quiz-top");
   const body = container.querySelector(".fq-body");
   let cases, idx;
+
+  toggleBtn.addEventListener("click", function(){
+    const open = toggleBtn.getAttribute("aria-expanded") === "true";
+    toggleBtn.setAttribute("aria-expanded", open ? "false" : "true");
+    container.classList.toggle("open", !open);
+  });
 
   function renderDone(){
     body.innerHTML =
       '<div class="fq-done">' +
-        '<p>Revisaste los 3 casos de esta familia.</p>' +
+        '<p>Revisaste los 3 casos de este modus operandi.</p>' +
         '<div class="journal-actions"><button type="button" class="ghost-btn fq-restart">Practicar de nuevo →</button></div>' +
       '</div>';
     const restartBtn = body.querySelector(".fq-restart");
-    restartBtn.addEventListener("click", function(){ start(true); });
+    restartBtn.addEventListener("click", function(){ start({ moveFocus: true }); });
     restartBtn.focus();
   }
 
@@ -289,16 +314,25 @@ function setupFamilyQuiz(catKey, container){
     });
   }
 
-  // moveFocus: false en el primer armado (showFamily ya enfoca el botón
-  // "← Todos los modus operandi" justo después, ver más abajo — enfocar
-  // también aquí sería un salto de foco redundante); true al reiniciar
-  // desde "Practicar de nuevo", donde sí conviene volver a anunciar el
-  // título de esta sección.
-  function start(moveFocus){
+  // opts.collapse: true solo al entrar a la familia (showFamily) — vuelve a
+  // colapsar el desplegable aunque hubiera quedado abierto en una visita
+  // anterior, porque el contenido de abajo se acaba de rebarajar y no
+  // corresponde ya a lo que se veía. opts.moveFocus: true solo al reiniciar
+  // desde "Practicar de nuevo" (el desplegable ya está abierto y la persona
+  // lo está mirando), para llevar el foco al primer caso nuevo — el mismo
+  // manejo de foco que ya usa "Siguiente caso" entre casos.
+  function start(opts){
+    opts = opts || {};
+    if(opts.collapse){
+      toggleBtn.setAttribute("aria-expanded", "false");
+      container.classList.remove("open");
+    }
     cases = buildFamilyQuizCases(catKey);
     idx = 0;
     renderCase();
-    if(moveFocus){ titleEl.focus(); }
+    if(opts.moveFocus){
+      body.querySelector(".statement").focus();
+    }
   }
 
   familyQuizControllers[catKey] = { start: start };
@@ -491,8 +525,9 @@ function showFamily(catKey, triggerEl){
   familyBackBtn.focus();
   // Cada vez que se entra a una familia se arma su mini-práctica con 3
   // casos nuevos (ver "Mini-práctica por familia" más arriba) — sin
-  // guardar nada entre visitas, igual que el resto del Catálogo.
-  if(familyQuizControllers[catKey]){ familyQuizControllers[catKey].start(); }
+  // guardar nada entre visitas, igual que el resto del Catálogo. Colapsada
+  // (collapse:true): la pantalla arranca limpia, igual que los expedientes.
+  if(familyQuizControllers[catKey]){ familyQuizControllers[catKey].start({ collapse: true }); }
 }
 function showFamilySelector(){
   familySelectorRoot.hidden = false;

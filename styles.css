@@ -267,6 +267,35 @@
      setupFamilyQuiz en app.js), solo con el espacio extra que necesita por
      venir después de la cuadrícula de expedientes en vez de estar sola. */
   .family-quiz{margin-top:28px;}
+  /* Encabezado clicable, mismo patrón visual que .card-top de los
+     expedientes (reutiliza esas clases genéricas tal cual: hover, foco,
+     tipografía del título). Solo el ícono y el texto de apoyo son propios
+     de esta mini-práctica, porque .card .expand-icon / .card .hook están
+     encerrados bajo el ancestro .card (los expedientes), no bajo
+     .family-quiz. */
+  .family-quiz-top .fq-top-hint{
+    display:block;
+    font-size:13.5px;
+    color:var(--ink-soft);
+    margin:2px 0 0;
+  }
+  .family-quiz-top .expand-icon{
+    display:inline-flex;
+    width:18px;
+    height:18px;
+    color:var(--ink-soft);
+    transition:transform .15s ease;
+    flex:none;
+    margin-top:2px;
+  }
+  .family-quiz-top .expand-icon svg{width:100%;height:100%;display:block;}
+  .family-quiz-top[aria-expanded="true"] .expand-icon{transform:rotate(180deg);}
+  /* Colapsada por defecto: mismo mecanismo que .card-detail/.card.open de
+     los expedientes (ver el comentario junto a esas reglas), solo que acá
+     la clase "open" vive en .family-quiz en vez de en .card, porque el
+     encabezado clicable y el contenido no comparten el mismo padre .card. */
+  .family-quiz-detail{display:none; margin-top:16px;}
+  .family-quiz.open .family-quiz-detail{display:block; animation:fadeSlideIn .18s ease;}
   .fq-done p{
     margin:0 0 16px;
     color:var(--ink-soft);
@@ -858,7 +887,7 @@
   }
   @keyframes fadeSlideIn{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:translateY(0);}}
   @media (prefers-reduced-motion: reduce){
-    .feedback.show, .card.open .card-detail, .opt-btn.correct, .opt-btn.wrong{animation:none;}
+    .feedback.show, .card.open .card-detail, .family-quiz.open .family-quiz-detail, .opt-btn.correct, .opt-btn.wrong{animation:none;}
     /* El "levitar" al pasar el mouse (.card, .family-card) usa transform,
        no animation: sin esta regla, animation:none de la línea de arriba no
        lo tocaría y el movimiento seguiría ahí para quien pidió menos
