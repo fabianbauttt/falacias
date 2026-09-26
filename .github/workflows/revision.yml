@@ -1,0 +1,15 @@
+# Revisión automática: cada cambio en main y cada PR se revisa en un
+# navegador (errores de JavaScript, archivos que faltan, enlaces rotos,
+# contenido que se sale de la pantalla y Panel docente).
+# La revisión en sí vive en fabianbauttt/PROYECTO-LEARNING.
+name: Revisión
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  revisar:
+    uses: fabianbauttt/PROYECTO-LEARNING/.github/workflows/revisar-juego.yml@main
